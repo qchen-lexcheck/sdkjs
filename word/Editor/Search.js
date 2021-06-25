@@ -608,6 +608,15 @@ CDocument.prototype.ReplaceSearchElement = function(NewStr, bAll, Id, bInterface
 
     var oState = this.SaveDocumentState();
 
+	/*var pEl = this.Content[0];
+    this.Content[1].Concat(pEl, true);
+	this.Internal_Content_Remove(0, 1);
+
+	this.Recalculate();
+	this.UpdateInterface();
+	this.UpdateRulers();
+	this.FinalizeAction();*/
+
     var arrReplaceId = [];
     if (bAll)
 	{
