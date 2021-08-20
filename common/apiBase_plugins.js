@@ -827,4 +827,24 @@
 		return "none";
 	};
 
+	/**
+     * Get current file for signging
+     * @memberof Api
+     * @typeofeditors ["CDE", "CSE", "CPE"]
+     * @alias GetFileToSign
+     */
+	Api.prototype["pluginMethod_GetFileToSign"] = function()
+	{
+		var format = Asc.c_oAscFileType[this.DocInfo.Format.toUpperCase()];
+		var opts = new Asc.asc_CDownloadOptions(format);
+		var t = this;
+		opts.callback = function(data) {
+			t.sync_EndAction(Asc.c_oAscAsyncActionType.BlockInteraction, Asc.c_oAscAsyncAction.DownloadAs);
+			t.fCurCallback = function(res) {
+				window.g_asc_plugins.onPluginEvent("onFileReadyToSign", {url: res.data, name : t.DocInfo.Title});
+			};
+		}
+		this.downloadAs(Asc.c_oAscAsyncAction.DownloadAs, opts);
+	};
+
 })(window);
