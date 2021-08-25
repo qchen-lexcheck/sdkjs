@@ -1637,6 +1637,9 @@ parserHelp.setDigitSeparator(AscCommon.g_oDefaultCultureInfo.NumberDecimalSepara
 			}
 		}
 	};
+	cRef.prototype.getDimensions = function () {
+		return {col: 1, row: 1, bbox: this.range.bbox};
+	};
 
 	/**
 	 * @constructor
@@ -1748,6 +1751,9 @@ parserHelp.setDigitSeparator(AscCommon.g_oDefaultCultureInfo.NumberDecimalSepara
 		}
 		var _r = this.getRange();
 		return excludeHiddenRows && _r && this.ws.getRowHidden(_r.r1);
+	};
+	cRef3D.prototype.getDimensions = function () {
+		return {col: 1, row: 1, bbox: this.range.bbox};
 	};
 
 	/**

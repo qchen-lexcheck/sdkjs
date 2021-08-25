@@ -5170,6 +5170,8 @@ function (window, undefined) {
 		return new cNumber(_count);
 	};
 
+	var counter = 0;
+	
 	/**
 	 * @constructor
 	 * @extends {AscCommonExcel.cBaseFunction}
@@ -5189,7 +5191,104 @@ function (window, undefined) {
 	cCOUNTIFS.prototype.returnValueType = AscCommonExcel.cReturnFormulaType.area_to_ref;
 	cCOUNTIFS.prototype.argumentsType = [[argType.reference, argType.any]];
 	cCOUNTIFS.prototype.Calculate = function (arg) {
+		//добавить кэщ, поскольку при большинстве повторяющихся вычислений, есть повторяющиеся поиски
+		if (counter > 0) {
+			return new cError(cErrorType.wrong_value_type);
+			
+		}
+		counter++;
+		console.time("asd");
+		var i, j, arg0, arg1, matchingInfo, arg0Matrix, arg1Matrix, _count = 0, colCount, rowCount, dimensionMatrix0;
+		for (var k = 0; k < arg.length; k += 2) {
+			arg0 = arg[k];
+			arg1 = arg[k + 1];
+			if (cElementType.cell !== arg0.type && cElementType.cell3D !== arg0.type &&
+				cElementType.cellsRange !== arg0.type &&
+				!(cElementType.cellsRange3D === arg0.type && arg0.isSingleSheet())) {
+				return new cError(cErrorType.wrong_value_type);
+			}
+
+			if (cElementType.cellsRange === arg1.type || cElementType.cellsRange3D === arg1.type) {
+				arg1 = arg1.cross(arguments[1]);
+			} else if (cElementType.array === arg1.type) {
+				arg1 = arg1.getElementRowCol(0, 0);
+			}
+
+			arg1 = arg1.tocString();
+			if (cElementType.string !== arg1.type) {
+				return new cError(cErrorType.wrong_value_type);
+			}
+			matchingInfo = AscCommonExcel.matchingValue(arg1);
+
+			/*arg1Matrix = arg0.getMatrix();
+			if (cElementType.cellsRange3D === arg0.type) {
+				arg1Matrix = arg1Matrix[0];
+			}*/
+
+			var dimensionMatrix = arg0.getDimensions();
+			var ws = arg0.getWS();
+			console.time("getRange3");
+			var matrixRange = ws.getRange3(dimensionMatrix.bbox.r1, dimensionMatrix.bbox.c1, dimensionMatrix.bbox.r2, dimensionMatrix.bbox.c2);
+			console.timeEnd("getRange3");
+			arg1Matrix = [];
+			console.time("_foreachNoEmpty");
+			matrixRange._foreachNoEmpty(function (cell, i, j, r1, c1) {
+				if (!arg1Matrix[i - r1]) {
+					arg1Matrix[i - r1] = [];
+				}
+				arg1Matrix[i - r1][j - c1] = checkTypeCell(cell);
+			});
+			console.timeEnd("_foreachNoEmpty");
+			if (!arg0Matrix) {
+				arg0Matrix = arg1Matrix;
+				dimensionMatrix0 = dimensionMatrix;
+			}
+
+			if (dimensionMatrix0.col !== dimensionMatrix.col || dimensionMatrix0.row !== dimensionMatrix.row) {
+				return new cError(cErrorType.wrong_value_type);
+			}
+
+			console.time("for");
+			var empty = new cEmpty();
+			for (i = 0; i < dimensionMatrix0.row; ++i) {
+				for (j = 0; j < dimensionMatrix0.col; ++j) {
+					var _elem = arg1Matrix[i] && arg1Matrix[i][j] ? arg1Matrix[i][j] : empty;
+					if (!matching(_elem, matchingInfo)) {
+						if (!arg0Matrix[i]) {
+							arg0Matrix[i] = [];
+						}
+						arg0Matrix[i][j] = null;
+					}
+				}
+			}
+			console.timeEnd("for");
+		}
+
+		console.time("for2");
+		for (i = 0; i < arg0Matrix.length; ++i) {
+			for (j = 0; j < arg0Matrix[i].length; ++j) {
+				if (arg0Matrix[i][j]) {
+					++_count;
+				}
+			}
+		}
+		console.timeEnd("for2");
+		console.timeEnd("asd");
+		return new cNumber(_count);
+	};
+	cCOUNTIFS.prototype.checkArguments = function (countArguments) {
+		return 0 === countArguments % 2 && cBaseFunction.prototype.checkArguments.apply(this, arguments);
+	};
+
+	
+	cCOUNTIFS.prototype.Calculate2 = function (arg) {
 		var i, j, arg0, arg1, matchingInfo, arg0Matrix, arg1Matrix, _count = 0;
+		if (counter > 5) {
+			return new cError(cErrorType.wrong_value_type);
+
+		}
+		counter++;
+		console.time("sdf")
 		for (var k = 0; k < arg.length; k += 2) {
 			arg0 = arg[k];
 			arg1 = arg[k + 1];
@@ -5240,6 +5339,7 @@ function (window, undefined) {
 				}
 			}
 		}
+		console.timeEnd("sdf")
 		return new cNumber(_count);
 	};
 	cCOUNTIFS.prototype.checkArguments = function (countArguments) {
