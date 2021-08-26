@@ -1663,7 +1663,7 @@
 				return aPastedImages;
 			},
 
-			_checkCutBefore: function(ws, pastedWb) {
+			_checkCutBefore: function(ws, pastedWb, isLocalPaste) {
 				var res = false;
 
 				//***MOVE***
@@ -1671,7 +1671,7 @@
 				//чтобы не передавать изменения на сервер, даже в случае одного пользователя в разных вкладках
 				//вырезать и вставить будут работать независимо, поэтому при вставке сравнивем ещё и id юзера
 
-				if(this._checkPastedInOriginalDoc(pastedWb) && null !== window["Asc"]["editor"].wb.cutIdSheet) {
+				if((isLocalPaste || this._checkPastedInOriginalDoc(pastedWb)) && null !== window["Asc"]["editor"].wb.cutIdSheet) {
 					var wsFrom = window["Asc"]["editor"].wb.getWorksheetById(window["Asc"]["editor"].wb.cutIdSheet);
 					var fromRange = wsFrom ? wsFrom.cutRange : null;
 					if(fromRange) {

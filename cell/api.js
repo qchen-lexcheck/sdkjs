@@ -6152,6 +6152,19 @@ var editor;
 		this.sendEvent("asc_onHideForeignCursorLabel", UserId);
 	};
 
+	spreadsheet_api.prototype.asc_checkCanPasteCutCells = function () {
+		return this.wb.cutIdSheet !== null;
+	};
+
+	spreadsheet_api.prototype.asc_pasteCutCells = function () {
+		if (this.wb.cutIdSheet !== null) {
+			var ws = this.wb.getWorksheet();
+			if (ws) {
+				ws.pasteCutCells();
+			}
+		}
+	};
+
   /*
    * Export
    * -----------------------------------------------------------------------------

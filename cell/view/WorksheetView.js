@@ -22568,6 +22568,13 @@
 		}
 	};
 
+	WorksheetView.prototype.pasteCutCells = function () {
+		
+		if (AscCommonExcel.g_clipboardExcel.pasteProcessor._checkCutBefore(this, null, true)) {
+			AscCommon.g_clipboardBase.ClearBuffer();
+		}
+	};
+
 	//------------------------------------------------------------export---------------------------------------------------
     window['AscCommonExcel'] = window['AscCommonExcel'] || {};
 	window["AscCommonExcel"].CellFlags = CellFlags;
