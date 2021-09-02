@@ -9931,8 +9931,6 @@
 				this.stream.GetBool();
 			} else if (c_oSer_SheetView.RightToLeft === type) {
 				this.stream.GetBool();
-			} else if (c_oSer_SheetView.ShowFormulas === type) {
-				this.stream.GetBool();
 			} else if (c_oSer_SheetView.ShowGridLines === type) {
 				oSheetView.showGridLines = this.stream.GetBool();
 			} else if (c_oSer_SheetView.ShowOutlineSymbols === type) {
