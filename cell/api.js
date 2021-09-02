@@ -3173,6 +3173,10 @@ var editor;
 	spreadsheet_api.prototype.asc_setShowZeros = function (value) {
 		this.wb.getWorksheet().changeSheetViewSettings(AscCH.historyitem_Worksheet_SetShowZeros, value);
 	};
+	
+	spreadsheet_api.prototype.asc_setShowFormulas = function (value) {
+		this.wb.getWorksheet().changeSheetViewSettings(AscCH.historyitem_Worksheet_SetShowFormulas, value);
+	};
 
   // Images & Charts
 
@@ -6305,6 +6309,7 @@ var editor;
   prot["asc_setDisplayGridlines"] = prot.asc_setDisplayGridlines;
   prot["asc_setDisplayHeadings"] = prot.asc_setDisplayHeadings;
   prot["asc_setShowZeros"] = prot.asc_setShowZeros;
+  prot["asc_setShowFormulas"] = prot.asc_setShowFormulas;
 
   // Defined Names
   prot["asc_getDefinedNames"] = prot.asc_getDefinedNames;

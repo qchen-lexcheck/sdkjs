@@ -2687,6 +2687,7 @@
 			this.zoomScale = 100;
 
 			this.showZeros = null;
+			this.showFormulas = null;
 
 			this.topLeftCell = null;
 
@@ -2704,6 +2705,8 @@
 					result.pane = this.pane.clone();
 				}
 				result.showZeros = this.showZeros;
+				result.showFormulas = this.showFormulas;
+				
 				result.topLeftCell = this.topLeftCell;
 				return result;
 			},
@@ -2717,10 +2720,12 @@
 			asc_getZoomScale: function () { return this.zoomScale; },
 			asc_getIsFreezePane: function () { return null !== this.pane && this.pane.isInit(); },
 			asc_getShowZeros: function () { return false !== this.showZeros; },
+			asc_getShowFormulas: function () { return false !== this.showFormulas; },
 			asc_setShowGridLines: function (val) { this.showGridLines = val; },
 			asc_setShowRowColHeaders: function (val) { this.showRowColHeaders = val; },
 			asc_setZoomScale: function (val) { this.zoomScale = val; },
-			asc_setShowZeros: function (val) { this.showZeros = val; }
+			asc_setShowZeros: function (val) { this.showZeros = val; },
+			asc_setShowFormulas: function () { this.showFormulas = val; },
 		};
 
 		/** @constructor */
@@ -3442,9 +3447,11 @@
 		prot["asc_getShowRowColHeaders"] = prot.asc_getShowRowColHeaders;
 		prot["asc_getIsFreezePane"] = prot.asc_getIsFreezePane;
 		prot["asc_getShowZeros"] = prot.asc_getShowZeros;
+		prot["asc_getShowFormulas"] = prot.asc_getShowFormulas;
 		prot["asc_setShowGridLines"] = prot.asc_setShowGridLines;
 		prot["asc_setShowRowColHeaders"] = prot.asc_setShowRowColHeaders;
 		prot["asc_setShowZeros"] = prot.asc_setShowZeros;
+		prot["asc_getShowFormulas"] = prot.asc_setShowFormulas;
 
 		window["AscCommonExcel"].asc_CPane = asc_CPane;
 		window["AscCommonExcel"].asc_CSheetPr = asc_CSheetPr;

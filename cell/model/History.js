@@ -104,6 +104,8 @@ function (window, undefined) {
 
 	window['AscCH'].historyitem_Worksheet_AddProtectedRange = 56;
 	window['AscCH'].historyitem_Worksheet_DelProtectedRange = 57;
+	
+	window['AscCH'].historyitem_Worksheet_SetShowFormulas = 58;
 
 	window['AscCH'].historyitem_RowCol_Fontname = 1;
 	window['AscCH'].historyitem_RowCol_Fontsize = 2;
