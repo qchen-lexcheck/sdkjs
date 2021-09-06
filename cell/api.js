@@ -6165,10 +6165,20 @@ var editor;
 		}
 	};
 
-	spreadsheet_api.prototype.asc_getCellWatches = function (aCellWatches) {
+	spreadsheet_api.prototype.asc_getCellWatches = function () {
+		var res = null;
 		if (this.wb && this.wb.model) {
-			this.wb.model.dellCellWatches(aCellWatches);
+			for (var i = 0; i < this.wb.model.aWorksheets.length; i++) {
+				var ws = this.wb.model.aWorksheets[i];
+				if (ws && ws.aCellWatches.length) {
+					if (!res) {
+						res = [];
+					}
+					res = res.concat(ws.aCellWatches);
+				}
+			}
 		}
+		return res;
 	};
 
   /*
@@ -6662,6 +6672,8 @@ var editor;
 
   prot["asc_addCellWatches"]               = prot.asc_addCellWatches;
   prot["asc_deleteCellWatches"]            = prot.asc_deleteCellWatches;
+  prot["asc_getCellWatches"]               = prot.asc_getCellWatches;
+
 
 
 

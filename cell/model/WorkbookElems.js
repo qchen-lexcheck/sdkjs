@@ -11593,6 +11593,13 @@ QueryTableField.prototype.clone = function() {
 		this.r = null;
 
 		this._ws = ws;
+		this._workbook = null;
+		this._sheet = null;
+		this._name = null;
+		this._cell = null;
+		this._value = null;
+		this._formula = null;
+
 		return this;
 	}
 	CCellWatch.prototype.clone = function () {
@@ -11600,6 +11607,24 @@ QueryTableField.prototype.clone = function() {
 	};
 	CCellWatch.prototype.setRef = function (ref) {
 		this.r = ref;
+	};
+	CCellWatch.prototype.asc_getWorkbook = function () {
+		return this._workbook;
+	};
+	CCellWatch.prototype.asc_getSheet = function () {
+		return this._sheet;
+	};
+	CCellWatch.prototype.asc_getName = function () {
+		return this._name;
+	};
+	CCellWatch.prototype.asc_getCell = function () {
+		return this._cell;
+	};
+	CCellWatch.prototype.asc_getValue = function () {
+		return this._value;
+	};
+	CCellWatch.prototype.asc_getFormula = function () {
+		return this._formula;
 	};
 
 
@@ -11963,5 +11988,12 @@ QueryTableField.prototype.clone = function() {
 
 	window["AscCommonExcel"].CCellWatch = CCellWatch;
 	prot = CCellWatch.prototype;
+	prot["asc_getWorkbook"] = prot.asc_getWorkbook;
+	prot["asc_getSheet"] = prot.asc_getSheet;
+	prot["asc_getName"] = prot.asc_getName;
+	prot["asc_getCell"] = prot.asc_getCell;
+	prot["asc_getValue"] = prot.asc_getValue;
+	prot["asc_getFormula"] = prot.asc_getFormula;
+
 
 })(window);
