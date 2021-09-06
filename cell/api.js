@@ -6153,6 +6153,12 @@ var editor;
 		this.sendEvent("asc_onHideForeignCursorLabel", UserId);
 	};
 
+	spreadsheet_api.prototype.asc_addCellWatches = function (sRange) {
+		if (this.wb && this.wb.model) {
+			this.wb.model.addCellWatches(sRange);
+		}
+	};
+
   /*
    * Export
    * -----------------------------------------------------------------------------
@@ -6641,6 +6647,9 @@ var editor;
   prot["asc_getProtectedWorkbook"]         = prot.asc_getProtectedWorkbook;
   prot["asc_setProtectedWorkbook"]         = prot.asc_setProtectedWorkbook;
   prot["asc_isProtectedWorkbook"]          = prot.asc_isProtectedWorkbook;
+
+  prot["asc_addCellWatches"]               = prot.asc_addCellWatches;
+
 
 
 })(window);

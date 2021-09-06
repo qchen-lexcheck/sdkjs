@@ -11589,6 +11589,16 @@ QueryTableField.prototype.clone = function() {
 		return this.name;
 	};
 
+	function CCellWatch() {
+		this.r = null;
+
+		return this;
+	}
+
+	CCellWatch.prototype.clone = function () {
+
+	};
+
 
 
 	//----------------------------------------------------------export----------------------------------------------------

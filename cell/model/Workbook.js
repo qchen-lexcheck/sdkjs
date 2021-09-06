@@ -3811,6 +3811,49 @@
 		return res;
 	};
 
+	Workbook.prototype.addCellWatches = function (sRange) {
+		var range;
+		var ws;
+		if (sRange) {
+			if (-1 !== sRange.indexOf("!")) {
+				var is3DRef = AscCommon.parserHelp.parse3DRef(item);
+				if (is3DRef) {
+					range = is3DRef.range;
+					ws = this.getWorksheetByName(range.sheet);
+				}
+			} else {
+				ws = this.getActiveWs();
+				range = AscCommonExcel.g_oRangeCache.getAscRange(sRange);
+				//может быть именованный диапазон
+				if (!range) {
+					var dN = this.dependencyFormulas.getDefNameByName(sRange, ws.getId());
+					if (dN && dN.parsedRef) {
+						range = dN.parsedRef.getFirstRange();
+						if (range) {
+							range = range.bbox;
+						}
+					}
+				}
+			}
+
+		}
+
+		History.Create_NewPoint();
+		History.StartTransaction();
+
+		//TODO protection!
+		if (ws && range) {
+			for (var i = range.r1; i <= range.r2; i++) {
+				for (var j = range.c1; j <= range.c2; j++) {
+					ws.addCellWatch(i, j);
+				}
+			}
+		}
+
+		History.EndTransaction();
+	};
+
+
 //-------------------------------------------------------------------------------------------------
 	var tempHelp = new ArrayBuffer(8);
 	var tempHelpUnit = new Uint8Array(tempHelp);
@@ -4094,9 +4137,9 @@
 		this.activeNamedSheetViewId = null;
 		this.defaultViewHiddenRows = null;
 
-		//по умолчанию null, создаю объект для отладки
 		this.sheetProtection = null;
 		this.aProtectedRanges = [];
+		this.aCellWatches = [];
 	}
 
 	Worksheet.prototype.getCompiledStyle = function (row, col, opt_cell, opt_styleComponents) {
@@ -10559,6 +10602,16 @@
 	Worksheet.prototype.isLockedActiveCell = function () {
 		var activeCell = this.selectionRange.activeCell;
 		return this.getLockedCell(activeCell.col, activeCell.row);
+	};
+
+	Worksheet.prototype.addCellWatch = function (ref) {
+		for (var i = 0; i < this.aCellWatches.length; i++) {
+			if (ref.isEqual(this.aCellWatches[i].r)) {
+				return;
+			}
+		}
+
+
 	};
 
 //-------------------------------------------------------------------------------------------------
