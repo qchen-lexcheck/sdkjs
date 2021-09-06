@@ -105,6 +105,9 @@ function (window, undefined) {
 	window['AscCH'].historyitem_Worksheet_AddProtectedRange = 56;
 	window['AscCH'].historyitem_Worksheet_DelProtectedRange = 57;
 
+	window['AscCH'].historyitem_Worksheet_AddCellWatch = 58;
+	window['AscCH'].historyitem_Worksheet_DelCellWatch = 59;
+
 	window['AscCH'].historyitem_RowCol_Fontname = 1;
 	window['AscCH'].historyitem_RowCol_Fontsize = 2;
 	window['AscCH'].historyitem_RowCol_Fontcolor = 3;

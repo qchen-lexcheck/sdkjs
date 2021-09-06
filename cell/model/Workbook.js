@@ -3845,9 +3845,23 @@
 		if (ws && range) {
 			for (var i = range.r1; i <= range.r2; i++) {
 				for (var j = range.c1; j <= range.c2; j++) {
-					ws.addCellWatch(i, j);
+					var _ref = new Asc.Range(j, i, j, i);
+					ws.addCellWatch(_ref, true);
 				}
 			}
+		}
+
+		History.EndTransaction();
+	};
+
+	Workbook.prototype.dellCellWatches = function (aCellWatches) {
+		History.Create_NewPoint();
+		History.StartTransaction();
+
+		//TODO protection!
+		for (var i = 0; i < aCellWatches.length; i++) {
+			var ws = aCellWatches[i]._ws;
+			ws.deleteCellWatch(aCellWatches[i]);
 		}
 
 		History.EndTransaction();
@@ -10604,15 +10618,37 @@
 		return this.getLockedCell(activeCell.col, activeCell.row);
 	};
 
-	Worksheet.prototype.addCellWatch = function (ref) {
+	Worksheet.prototype.addCellWatch = function (ref, addToHistory) {
 		for (var i = 0; i < this.aCellWatches.length; i++) {
 			if (ref.isEqual(this.aCellWatches[i].r)) {
 				return;
 			}
 		}
 
+		var cellWatch = new AscCommonExcel.CCellWatch(this);
+		cellWatch.setRef(ref);
+		this.aCellWatches.push(cellWatch);
 
+		if (addToHistory) {
+			History.Add(AscCommonExcel.g_oUndoRedoWorksheet, AscCH.historyitem_Worksheet_AddCellWatch, this.getId(),
+				null, new AscCommonExcel.UndoRedoData_FromTo(null, new AscCommonExcel.UndoRedoData_BBox(ref)));
+		}
 	};
+
+	Worksheet.prototype.deleteCellWatch = function (ref, addToHistory) {
+		for (var i = 0; i < this.aCellWatches.length; i++) {
+			if (ref.isEqual(this.aCellWatches[i].r)) {
+				this.aCellWatches.splice(i, 1);
+				if (addToHistory) {
+					History.Add(AscCommonExcel.g_oUndoRedoWorksheet, AscCH.historyitem_Worksheet_DelCellWatch,
+						this.getId(), null,
+						new AscCommonExcel.UndoRedoData_FromTo(new AscCommonExcel.UndoRedoData_BBox(ref), null));
+				}
+				break;
+			}
+		}
+	};
+
 
 //-------------------------------------------------------------------------------------------------
 	var g_nCellOffsetFlag = 0;

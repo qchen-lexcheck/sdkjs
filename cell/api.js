@@ -6159,6 +6159,18 @@ var editor;
 		}
 	};
 
+	spreadsheet_api.prototype.asc_deleteCellWatches = function (aCellWatches) {
+		if (this.wb && this.wb.model) {
+			this.wb.model.dellCellWatches(aCellWatches);
+		}
+	};
+
+	spreadsheet_api.prototype.asc_getCellWatches = function (aCellWatches) {
+		if (this.wb && this.wb.model) {
+			this.wb.model.dellCellWatches(aCellWatches);
+		}
+	};
+
   /*
    * Export
    * -----------------------------------------------------------------------------
@@ -6649,6 +6661,8 @@ var editor;
   prot["asc_isProtectedWorkbook"]          = prot.asc_isProtectedWorkbook;
 
   prot["asc_addCellWatches"]               = prot.asc_addCellWatches;
+  prot["asc_deleteCellWatches"]            = prot.asc_deleteCellWatches;
+
 
 
 

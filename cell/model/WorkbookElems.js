@@ -11589,14 +11589,17 @@ QueryTableField.prototype.clone = function() {
 		return this.name;
 	};
 
-	function CCellWatch() {
+	function CCellWatch(ws) {
 		this.r = null;
 
+		this._ws = ws;
 		return this;
 	}
-
 	CCellWatch.prototype.clone = function () {
 
+	};
+	CCellWatch.prototype.setRef = function (ref) {
+		this.r = ref;
 	};
 
 
@@ -11957,5 +11960,8 @@ QueryTableField.prototype.clone = function() {
 	prot["asc_getFormulaResult"] = prot.asc_getFormulaResult;
 	prot["asc_getFunctionResult"] = prot.asc_getFunctionResult;
 	prot["asc_getName"] = prot.asc_getName;
+
+	window["AscCommonExcel"].CCellWatch = CCellWatch;
+	prot = CCellWatch.prototype;
 
 })(window);
