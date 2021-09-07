@@ -3867,6 +3867,11 @@
 		History.EndTransaction();
 	};
 
+	Workbook.prototype.recalculateCellWatches = function (fullRecalc) {
+		for(var i = 0; i < this.aWorksheets.length; ++i) {
+			this.aWorksheets[i].recalculateCellWatches(fullRecalc);
+		}
+	};
 
 //-------------------------------------------------------------------------------------------------
 	var tempHelp = new ArrayBuffer(8);
@@ -10649,6 +10654,11 @@
 		}
 	};
 
+	Worksheet.prototype.recalculateCellWatches = function (fullRecalc) {
+		for (var i = 0; i < this.aCellWatches.length; i++) {
+			this.aCellWatches[i].recalculate(fullRecalc);
+		}
+	};
 
 //-------------------------------------------------------------------------------------------------
 	var g_nCellOffsetFlag = 0;

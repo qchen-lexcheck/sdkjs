@@ -11600,13 +11600,21 @@ QueryTableField.prototype.clone = function() {
 		this._value = null;
 		this._formula = null;
 
+		this.needRecalc = null;
+
 		return this;
 	}
 	CCellWatch.prototype.clone = function () {
 
 	};
+	CCellWatch.prototype.setNeedRecalc = function () {
+		this.needRecalc = true;
+	};
 	CCellWatch.prototype.setRef = function (ref) {
 		this.r = ref;
+	};
+	CCellWatch.prototype.clone = function () {
+
 	};
 	CCellWatch.prototype.asc_getWorkbook = function () {
 		return this._workbook;
@@ -11626,6 +11634,34 @@ QueryTableField.prototype.clone = function() {
 	CCellWatch.prototype.asc_getFormula = function () {
 		return this._formula;
 	};
+	CCellWatch.prototype.recalculate = function (ignoreNeedRecalc) {
+		if (this.needRecalc || ignoreNeedRecalc) {
+			if (this._ws) {
+				var docInfo = window["Asc"]["editor"].DocInfo;
+				this._workbook = docInfo ? docInfo.get_Title() : "";
+				this._sheet = this._ws.sName;
+				this._name = null;
+
+
+				this._cell = this.r ? this.r.getName() : this.r;
+
+				var formula = "";
+				var value = "";
+				this.getCell3(activeCell.row, activeCell.col)._foreachNoEmpty(function (cell) {
+					if (cell.isFormula()) {
+						formula = cell.getValueForEdit();
+					}
+					value = cell.getValue();
+				});
+
+				this._value = value;
+				this._formula = formula;
+
+				this.needRecalc = null;
+			}
+		}
+	};
+
 
 
 
