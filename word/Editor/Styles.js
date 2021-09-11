@@ -9784,17 +9784,63 @@ CStyles.prototype.GetDefaultTextPrForWrite = function()
 	return this.Default.TextPr.GetDiff(oTextPr);
 };
 
-function CDocumentColor(r,g,b, Auto)
+function CDocumentColor(r, g, b, Auto)
 {
-    this.r = r;
-    this.g = g;
-    this.b = b;
+	this.Color = 0x00000000;
+    // this.r = r;
+    // this.g = g;
+    // this.b = b;
+	//
+    // this.Auto = ( Auto === undefined ? false : Auto );
 
-    this.Auto = ( Auto === undefined ? false : Auto );
+	this.Set(r, g, b, Auto);
 }
 
 CDocumentColor.prototype =
 {
+	get r()
+	{
+		return ((this.Color >> 24) & 0xFF);
+	},
+
+	set r(v)
+	{
+		this.Color = (this.Color & 0x00FFFFFF) | ((v & 0xFF) << 24);
+	},
+
+	get g()
+	{
+		return ((this.Color >> 16) & 0xFF);
+	},
+
+	set g(v)
+	{
+		this.Color = (this.Color & 0xFF00FFFF) | ((v & 0xFF) << 16);
+	},
+
+	get b()
+	{
+		return ((this.Color >> 8) & 0xFF);
+	},
+
+	set b(v)
+	{
+		this.Color = (this.Color & 0xFFFF00FF) | ((v & 0xFF) << 8);
+	},
+
+	get Auto()
+	{
+		return !!(this.Color & 1);
+	},
+
+	set Auto(isAuto)
+	{
+		if (isAuto)
+			this.Color |= 1;
+		else
+			this.Color &= 0xFFFFFFFF ^ 1;
+	},
+
     Copy : function()
     {
         return new CDocumentColor(this.r, this.g, this.b, this.Auto);
@@ -12260,20 +12306,132 @@ CTableCellPr.prototype.RemovePrChange = function()
 	delete this.ReviewInfo;
 };
 
+function CFontNameMap()
+{
+	this.Length   = 0;
+	this.IdToFont = [];
+	this.FontToId = {};
+}
+CFontNameMap.prototype.GetId = function(sName)
+{
+	var nRes = this.FontToId[sName];
+	if (undefined === nRes)
+	{
+		this.IdToFont[this.Length] = sName;
+		nRes = this.FontToId[sName] = this.Length++;
+	}
+
+	return nRes;
+};
+CFontNameMap.prototype.GetName = function(nId)
+{
+	var sRes = this.IdToFont[nId];
+	if (!sRes)
+		return "Arial";
+
+	return sRes;
+};
+
 function CRFonts()
 {
-    this.Ascii    = undefined;
-    this.EastAsia = undefined;
-    this.HAnsi    = undefined;
-    this.CS       = undefined;
+	this.FontId1 = 0x00000000;
+	this.FontId2 = 0x00000000;
+	this.ThemeId = 0x00000000;
+
+    // this.Ascii    = undefined;
+    // this.EastAsia = undefined;
+    // this.HAnsi    = undefined;
+    // this.CS       = undefined;
     this.Hint     = undefined;
 
-    this.AsciiTheme    = undefined;
-    this.EastAsiaTheme = undefined;
-    this.HAnsiTheme    = undefined;
-    this.CSTheme       = undefined;
+    // this.AsciiTheme    = undefined;
+    // this.EastAsiaTheme = undefined;
+    // this.HAnsiTheme    = undefined;
+    // this.CSTheme       = undefined;
 }
-
+CRFonts.prototype =
+{
+	get Ascii()
+	{
+		var nId = (this.FontId1 >> 16) & 0xFFFF;
+		return 0xFFFE === nId ? undefined : {Name : AscCommonWord.g_oFontNameMap.GetName(nId), Index : -1};
+	},
+	set Ascii(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj.Name) : 0xFFFE;
+		this.FontId1 = (this.FontId1 & 0xFFFF) | ((nId << 16) & 0xFFFF0000);
+	},
+	get EastAsia()
+	{
+		var nId = this.FontId1 & 0xFFFF;
+		return 0xFFFE === nId ? undefined : {Name : AscCommonWord.g_oFontNameMap.GetName(nId), Index : -1};
+	},
+	set EastAsia(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj.Name) : 0xFFFE;
+		this.FontId1 = (this.FontId1 & 0xFFFF0000) | (nId & 0xFFFF);
+	},
+	get HAnsi()
+	{
+		var nId = (this.FontId2 >> 16) & 0xFFFF;
+		return 0xFFFE === nId ? undefined : {Name : AscCommonWord.g_oFontNameMap.GetName(nId), Index : -1};
+	},
+	set HAnsi(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj.Name) : 0xFFFE;
+		this.FontId2 = (this.FontId2 & 0xFFFF) | ((nId << 16) & 0xFFFF0000);
+	},
+	get CS()
+	{
+		var nId = this.FontId2 & 0xFFFF;
+		return 0xFFFE === nId ? undefined : {Name : AscCommonWord.g_oFontNameMap.GetName(nId), Index : -1};
+	},
+	set CS(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj.Name) : 0xFFFE;
+		this.FontId2 = (this.FontId1 & 0xFFFF0000) | (nId & 0xFFFF);
+	},
+	get AsciiTheme()
+	{
+		var nId = (this.ThemeId >> 24) & 0xFF;
+		return 0xFE === nId ? undefined : AscCommonWord.g_oFontNameMap.GetName(nId);
+	},
+	set AsciiTheme(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj) : 0xFE;
+		this.ThemeId = (this.ThemeId & 0x00FFFFFF) | ((nId << 24) & 0xFF000000);
+	},
+	get EastAsiaTheme()
+	{
+		var nId = (this.ThemeId >> 16) & 0xFF;
+		return 0xFE === nId ? undefined : AscCommonWord.g_oFontNameMap.GetName(nId);
+	},
+	set EastAsiaTheme(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj) : 0xFE;
+		this.ThemeId = (this.ThemeId & 0xFF00FFFF) | ((nId << 16) & 0xFF0000);
+	},
+	get HAnsiTheme()
+	{
+		var nId = (this.ThemeId >> 8) & 0xFF;
+		return 0xFE === nId ? undefined : AscCommonWord.g_oFontNameMap.GetName(nId);
+	},
+	set HAnsiTheme(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj) : 0xFE;
+		this.ThemeId = (this.ThemeId & 0xFFFF00FF) | ((nId << 8) & 0xFF00);
+	},
+	get CSTheme()
+	{
+		var nId = this.ThemeId & 0xFF;
+		return 0xFE === nId ? undefined : AscCommonWord.g_oFontNameMap.GetName(nId);
+	},
+	set CSTheme(Obj)
+	{
+		var nId = Obj ? AscCommonWord.g_oFontNameMap.GetId(Obj) : 0xFE;
+		this.ThemeId = (this.ThemeId & 0xFFFFFF00) | (nId & 0xFF);
+	}
+};
 CRFonts.prototype.Is_Empty = function()
 {
 	return (undefined === this.Ascii
@@ -12761,37 +12919,40 @@ CLang.prototype.Is_Equal = function(Lang)
 
 function CTextPr()
 {
-    this.Bold       = undefined; // Жирный текст
-    this.Italic     = undefined; // Наклонный текст
-    this.Strikeout  = undefined; // Зачеркивание
-    this.Underline  = undefined;
-    this.FontFamily = undefined;
-    this.FontSize   = undefined;
-    this.Color      = undefined;
-    this.VertAlign  = undefined;
-    this.HighLight  = undefined; // highlight_None/Color
-    this.RStyle     = undefined;
-    this.Spacing    = undefined; // Дополнительное расстояние между символвами
-    this.DStrikeout = undefined; // Двойное зачеркивание
-    this.Caps       = undefined;
-    this.SmallCaps  = undefined;
-    this.Position   = undefined; // Смещение по Y
+	this.UndefinedFlags = 0x00000000;
+	this.BoolFlags      = 0x00000000;
 
-    this.RFonts     = new CRFonts();
-    this.BoldCS     = undefined;
-    this.ItalicCS   = undefined;
-    this.FontSizeCS = undefined;
-    this.CS         = undefined;
-    this.RTL        = undefined;
-    this.Lang       = new CLang();
-    this.Unifill    = undefined;
-    this.FontRef    = undefined;
+	//this.Bold       = undefined; // Жирный текст
+	//this.Italic     = undefined; // Наклонный текст
+	//this.Strikeout  = undefined; // Зачеркивание
+	//this.Underline  = undefined;
+	this.FontFamily = undefined;
+	this.FontSize   = undefined;
+	this.Color      = undefined;
+	this.VertAlign  = undefined;
+	this.HighLight  = undefined; // highlight_None/Color
+	this.RStyle     = undefined;
+	this.Spacing    = undefined; // Дополнительное расстояние между символвами
+	//this.DStrikeout = undefined; // Двойное зачеркивание
+	//this.Caps       = undefined;
+	//this.SmallCaps  = undefined;
+	this.Position   = undefined; // Смещение по Y
 
-    this.Shd        = undefined;
-    this.Vanish     = undefined;
+	this.RFonts     = new CRFonts();
+	//this.BoldCS     = undefined;
+	//this.ItalicCS   = undefined;
+	this.FontSizeCS = undefined;
+	//this.CS         = undefined;
+	//this.RTL        = undefined;
+	this.Lang       = new CLang();
+	this.Unifill    = undefined;
+	this.FontRef    = undefined;
 
-    this.TextOutline    = undefined;
-    this.TextFill       = undefined;
+	this.Shd        = undefined;
+	//this.Vanish     = undefined;
+
+	this.TextOutline    = undefined;
+	this.TextFill       = undefined;
 	this.HighlightColor = undefined;
 	this.FontScale      = undefined;
 	this.FontSizeOrig   = undefined;
@@ -12800,6 +12961,150 @@ function CTextPr()
 	this.PrChange       = undefined;
 	this.ReviewInfo     = undefined;
 }
+CTextPr.prototype =
+{
+	private_GetBool : function(nBit)
+	{
+		return (this.UndefinedFlags & nBit ? !!(this.Flags & nBit) : undefined);
+	},
+
+	private_SetBool : function(nBit, isValue)
+	{
+		if (undefined === isValue)
+		{
+			this.UndefinedFlags &= 0xFFFFFFFF ^ nBit;
+		}
+		else
+		{
+			this.UndefinedFlags |= nBit;
+
+			if (isValue)
+				this.BoolFlags |= nBit;
+			else
+				this.BoolFlags &= 0xFFFFFFFF ^ nBit;
+		}
+	},
+
+	get Bold()
+	{
+		return this.private_GetBool(1);
+	},
+
+	set Bold(isValue)
+	{
+		this.private_SetBool(1, isValue);
+	},
+
+	get Italic()
+	{
+		return this.private_GetBool(2);
+	},
+
+	set Italic(isValue)
+	{
+		this.private_SetBool(2, isValue);
+	},
+
+	get Strikeout()
+	{
+		return this.private_GetBool(4);
+	},
+
+	set Strikeout(isValue)
+	{
+		this.private_SetBool(4, isValue);
+	},
+
+	get Underline()
+	{
+		return this.private_GetBool(8);
+	},
+
+	set Underline(isValue)
+	{
+		this.private_SetBool(8, isValue);
+	},
+
+	get DStrikeout()
+	{
+		return this.private_GetBool(16);
+	},
+
+	set DStrikeout(isValue)
+	{
+		this.private_SetBool(16, isValue);
+	},
+
+	get Caps()
+	{
+		return this.private_GetBool(32);
+	},
+
+	set Caps(isValue)
+	{
+		this.private_SetBool(32, isValue);
+	},
+
+	get SmallCaps()
+	{
+		return this.private_GetBool(64);
+	},
+
+	set SmallCaps(isValue)
+	{
+		this.private_SetBool(64, isValue);
+	},
+
+	get BoldCS()
+	{
+		return this.private_GetBool(128);
+	},
+
+	set BoldCS(isValue)
+	{
+		this.private_SetBool(128, isValue);
+	},
+
+	get ItalicCS()
+	{
+		return this.private_GetBool(256);
+	},
+
+	set ItalicCS(isValue)
+	{
+		this.private_SetBool(256, isValue);
+	},
+
+	get CS()
+	{
+		return this.private_GetBool(512);
+	},
+
+	set CS(isValue)
+	{
+		this.private_SetBool(512, isValue);
+	},
+
+	get RTL()
+	{
+		return this.private_GetBool(1024);
+	},
+
+	set RTL(isValue)
+	{
+		this.private_SetBool(1024, isValue);
+	},
+
+	get Vanish()
+	{
+		return this.private_GetBool(2048);
+	},
+
+	set Vanish(isValue)
+	{
+		this.private_SetBool(2048, isValue);
+	}
+};
 
 CTextPr.prototype.Clear = function()
 {
@@ -17304,6 +17609,8 @@ window["AscCommonWord"].highlight_None = highlight_None;
 window["AscCommonWord"].spacing_Auto = spacing_Auto;
 window["AscCommonWord"].wrap_NotBeside = wrap_NotBeside;
 window["AscCommonWord"].wrap_Around = wrap_Around;
+
+window["AscCommonWord"].g_oFontNameMap = new CFontNameMap();
 
 // Создаем глобальные дефолтовые стили, чтобы быстро можно было отдать дефолтовые настройки
 var g_oDocumentDefaultTextPr = new CTextPr();
