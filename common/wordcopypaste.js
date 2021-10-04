@@ -5055,6 +5055,81 @@ PasteProcessor.prototype =
 		}
 	},
 
+	_applySection: function (aContent, sectionLocation) {
+		
+		var nStartPos  = this.Selection.StartPos;
+		var nEndPos    = this.Selection.EndPos;
+		var nDirection = 1;
+
+		if (nEndPos < nStartPos)
+		{
+			nStartPos  = this.Selection.EndPos;
+			nEndPos    = this.Selection.StartPos;
+			nDirection = -1;
+		}
+
+		var oStartSectPr = this.SectionsInfo.Get_SectPr(nStartPos).SectPr;
+		var oEndSectPr   = this.SectionsInfo.Get_SectPr(nEndPos).SectPr;
+		if (!oStartSectPr || !oEndSectPr || (oStartSectPr === oEndSectPr && oStartSectPr.IsEqualColumnProps(ColumnsProps)))
+			return;
+
+		if (this.IsSelectionLocked(AscCommon.changestype_Document_SectPr))
+			return;
+
+		this.StartAction(AscDFH.historydescription_Document_SetColumnsProps);
+
+		var oEndParagraph = null;
+		if (type_Paragraph !== this.Content[nEndPos].GetType())
+		{
+			oEndParagraph = new Paragraph(this.DrawingDocument, this);
+			this.Add_ToContent(nEndPos + 1, oEndParagraph);
+		}
+		else
+		{
+			oEndParagraph = this.Content[nEndPos];
+		}
+
+		if (nStartPos > 0
+			&& (type_Paragraph !== this.Content[nStartPos - 1].GetType()
+				|| !this.Content[nStartPos - 1].Get_SectionPr()))
+		{
+			var oSectPr = new CSectionPr(this);
+			oSectPr.Copy(oStartSectPr, false);
+
+			var oStartParagraph = new Paragraph(this.DrawingDocument, this);
+			this.Add_ToContent(nStartPos, oStartParagraph);
+			oStartParagraph.Set_SectionPr(oSectPr, true);
+
+			nStartPos++;
+			nEndPos++;
+		}
+
+		if (nEndPos !== this.Content.length - 1)
+		{
+			oEndSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
+			var oSectPr = new CSectionPr(this);
+			oSectPr.Copy(oEndSectPr, false);
+			oEndParagraph.Set_SectionPr(oSectPr, true);
+			oSectPr.SetColumnProps(ColumnsProps);
+		}
+		else
+		{
+			oEndSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
+			oEndSectPr.SetColumnProps(ColumnsProps);
+		}
+
+		for (var nIndex = nStartPos; nIndex < nEndPos; ++nIndex)
+		{
+			var oElement = this.Content[nIndex];
+			if (type_Paragraph === oElement.GetType())
+			{
+				var oCurSectPr = oElement.Get_SectionPr();
+				if (oCurSectPr)
+					oCurSectPr.SetColumnProps(ColumnsProps);
+			}
+		}
+	},
+
 	_getClassBinaryFromHtml: function (node, onlyBinary) {
 		var classNode, base64FromExcel = null, base64FromWord = null, base64FromPresentation = null;
 
@@ -8896,7 +8971,7 @@ PasteProcessor.prototype =
 				if ("br" == sNodeName || bPageBreakBefore) {
 
 					//TODO пока комментирую добавление колонок
-					/*if (AscCommon.g_clipboardBase.pastedFrom === AscCommon.c_oClipboardPastedFrom.Word && pPr.msoWordSection && "section-break" === pPr["mso-break-type"]) {
+					if (AscCommon.g_clipboardBase.pastedFrom === AscCommon.c_oClipboardPastedFrom.Word && pPr.msoWordSection && "section-break" === pPr["mso-break-type"]) {
 						//section break
 						oThis._Add_NewParagraph();
 						var oSectPr = new CSectionPr(oThis.oLogicDocument);
@@ -8929,8 +9004,12 @@ PasteProcessor.prototype =
 						}
 						oSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
 						oThis.oCurPar.Set_SectionPr(oSectPr, true);
+						//oThis.previousMsoWordSecion = pPr.msoWordSection;
+						if (oThis.section && oThis.section[pPr.msoWordSection]) {
+							oThis.section[pPr.msoWordSection].end = oThis.aContent.length;
+						}
 						pPr.msoWordSection = null;
-					} else */if (bPageBreakBefore) {
+					} else if (bPageBreakBefore) {
 						bAddParagraph = oThis._Decide_AddParagraph(node.parentNode, pPr, bAddParagraph);
 						bAddParagraph = true;
 						oThis._Commit_Br(0, node, pPr);
@@ -9194,6 +9273,14 @@ PasteProcessor.prototype =
 
 				bAddParagraph =
 					oThis._Execute(child, Common_CopyObj(pPr), false, bAddParagraph, bIsBlockChild || bInBlock);
+
+				if (oThis.previousMsoWordSecion && oThis.previousMsoWordSecion === pPr.msoWordSection) {
+					if (oThis.section && oThis.section[pPr.msoWordSection]) {
+						oThis.section[pPr.msoWordSection].end = oThis.aContent.length;
+					}
+					pPr.msoWordSection = null;
+				}
+
 				if (bIsBlockChild) {
 					bAddParagraph = true;
 				}
@@ -9351,14 +9438,29 @@ PasteProcessor.prototype =
 				}
 			}
 
-			parseChildNodes();
-
 			//TODO пока не используется, поскольку есть проблемы при вставке колонок
-			/*if (AscCommon.g_clipboardBase.pastedFrom === AscCommon.c_oClipboardPastedFrom.Word) {
+			if (AscCommon.g_clipboardBase.pastedFrom === AscCommon.c_oClipboardPastedFrom.Word) {
 				if (child.className && -1 !== child.className.indexOf("WordSection")) {
+					if (!oThis.section) {
+						oThis.section = {};
+					}
 					pPr.msoWordSection = child.className;
-				}
-			}*/
+					oThis.section[pPr.msoWordSection] = {start: oThis.aContent.length};
+				}/*else {
+					if (child.className) {
+						if (oThis.previousMsoWordSecion) {
+							oThis._Add_NewParagraph();
+							var oSectPr = new CSectionPr(oThis.oLogicDocument);
+							oSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
+							oThis.oCurPar.Set_SectionPr(oSectPr, true);
+
+							oThis.previousMsoWordSecion = null;
+						}
+					}
+				}*/
+			}
+
+			parseChildNodes();
 
 			if (i === length - 1) {
 				oThis._commitCommentEnd();
