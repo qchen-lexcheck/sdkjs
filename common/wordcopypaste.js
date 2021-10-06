@@ -2277,6 +2277,8 @@ function PasteProcessor(api, bUploadImage, bUploadFonts, bNested, pasteInExcel, 
 
 	this.aMsoHeadStylesStr;
 	this.oMsoHeadStylesListMap = [];
+	this.oMsoSections;
+	this.msoWordSection;
 
 	this.rtfImages;
 }
@@ -5022,7 +5024,7 @@ PasteProcessor.prototype =
 			}
 			//на время заполнения контента для вставки отключаем историю
 			oThis._Execute(node, {}, true, true, false);
-			oThis._applySection(oThis.aContent, oThis.section);
+			oThis._applyMsoSections(oThis.aContent, oThis.oMsoSections);
 			oThis._AddNextPrevToContent(oThis.oDocument);
 
 			oThis.api.pre_Paste(fonts, images, executePasteWord);
@@ -5056,90 +5058,76 @@ PasteProcessor.prototype =
 		}
 	},
 
-	_applySection: function (aContent, sectionLocation) {
-		if (sectionLocation) {
-			for (var i in sectionLocation) {
-				var nStartPos  = sectionLocation[i].start;
-				var nEndPos    = sectionLocation[i].end;
-				var nDirection = 1;
+	_applyMsoSections: function (aContent, sections) {
+		if (sections) {
+			for (var i in sections) {
 
-				if (nEndPos < nStartPos)
-				{
-					nStartPos  = sectionLocation[i].end;
-					nEndPos    = sectionLocation[i].start;
-					nDirection = -1;
+				var columnsProps = sections[i].columnProps;
+				var nStartPos = sections[i].start;
+				var nEndPos = sections[i].end;
+				if (nEndPos < nStartPos) {
+					nStartPos = sections[i].end;
+					nEndPos = sections[i].start;
 				}
 
-
-				var nStartPos  = this.Selection.StartPos;
-				var nEndPos    = this.Selection.EndPos;
-				var nDirection = 1;
-
-				if (nEndPos < nStartPos)
-				{
-					nStartPos  = this.Selection.EndPos;
-					nEndPos    = this.Selection.StartPos;
-					nDirection = -1;
+				var nStartPosSelection = this.oLogicDocument.Selection.StartPos;
+				var nEndPosSelection = this.oLogicDocument.Selection.EndPos;
+				if (nEndPosSelection < nStartPosSelection) {
+					nStartPosSelection = this.oLogicDocument.Selection.EndPos;
+					nEndPosSelection = this.oLogicDocument.Selection.StartPos;
 				}
-				var oStartSectPr = this.SectionsInfo.Get_SectPr(nStartPos).SectPr;
-				var oEndSectPr   = this.SectionsInfo.Get_SectPr(nEndPos).SectPr;
-				if (!oStartSectPr || !oEndSectPr || (oStartSectPr === oEndSectPr && oStartSectPr.IsEqualColumnProps(ColumnsProps)))
+
+				var oStartSectPr = this.oLogicDocument.SectionsInfo.Get_SectPr(nStartPosSelection).SectPr;
+				var oEndSectPr = this.oLogicDocument.SectionsInfo.Get_SectPr(nEndPosSelection).SectPr;
+				if (!oStartSectPr || !oEndSectPr ||
+					(oStartSectPr === oEndSectPr && oStartSectPr.IsEqualColumnProps(columnsProps))) {
 					return;
-
+				}
 
 				var oEndParagraph = null;
-				if (type_Paragraph !== aContent[nEndPos].GetType())
-				{
-					oEndParagraph = new Paragraph(this.DrawingDocument, this);
-					this.Add_ToContent(nEndPos + 1, oEndParagraph);
-				}
-				else
-				{
+				if (type_Paragraph !== aContent[nEndPos].GetType()) {
+					oEndParagraph = new Paragraph(this.DrawingDocument, this.oLogicDocument);
+					aContent.splice(nEndPos, 0, oEndParagraph);
+				} else {
 					oEndParagraph = aContent[nEndPos];
 				}
 
-				if (nStartPos > 0
-					&& (type_Paragraph !== aContent[nStartPos - 1].GetType()
-						|| !aContent[nStartPos - 1].Get_SectionPr())) {
-					var oSectPr = new CSectionPr(this.oLogicDocument);
-					//oSectPr.Copy(oStartSectPr, false);
+				var oSectPr;
+				if (nStartPos > 0 && (type_Paragraph !== aContent[nStartPos - 1].GetType() || !aContent[nStartPos - 1].Get_SectionPr())) {
+
+					oSectPr = new CSectionPr(this.oLogicDocument);
+					oSectPr.Copy(oStartSectPr, false);
 
 					var oStartParagraph = new Paragraph(this.oLogicDocument.DrawingDocument, this.oLogicDocument);
-					this.Add_ToContent(nStartPos, oStartParagraph);
+					aContent.splice(nStartPos, 0, oStartParagraph);
 					oStartParagraph.Set_SectionPr(oSectPr, true);
 
 					nStartPos++;
 					nEndPos++;
 				}
 
-				/*if (nEndPos !== aContent.length - 1)
-				{
+				if (nEndPos !== aContent.length - 1) {
 					oEndSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
-					var oSectPr = new CSectionPr(this);
+					oSectPr = new CSectionPr(this.oLogicDocument);
 					oSectPr.Copy(oEndSectPr, false);
 					oEndParagraph.Set_SectionPr(oSectPr, true);
-					oSectPr.SetColumnProps(ColumnsProps);
-				}
-				else
-				{
+					oSectPr.SetColumnProps(columnsProps);
+				} else {
 					oEndSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
-					oEndSectPr.SetColumnProps(ColumnsProps);
+					oEndSectPr.SetColumnProps(columnsProps);
 				}
 
-				for (var nIndex = nStartPos; nIndex < nEndPos; ++nIndex)
-				{
-					var oElement = this.Content[nIndex];
-					if (type_Paragraph === oElement.GetType())
-					{
+				for (var nIndex = nStartPos; nIndex < nEndPos; ++nIndex) {
+					var oElement = aContent[nIndex];
+					if (type_Paragraph === oElement.GetType()) {
 						var oCurSectPr = oElement.Get_SectionPr();
-						if (oCurSectPr)
-							oCurSectPr.SetColumnProps(ColumnsProps);
+						if (oCurSectPr) {
+							oCurSectPr.SetColumnProps(columnsProps);
+						}
 					}
-				}*/
+				}
 			}
 		}
-
-
 	},
 
 	_getClassBinaryFromHtml: function (node, onlyBinary) {
@@ -8981,45 +8969,47 @@ PasteProcessor.prototype =
 				var bPageBreakBefore = "always" === node.style.pageBreakBefore ||
 					"left" === node.style.pageBreakBefore || "right" === node.style.pageBreakBefore;
 				if ("br" == sNodeName || bPageBreakBefore) {
-
-					//TODO пока комментирую добавление колонок
 					if (AscCommon.g_clipboardBase.pastedFrom === AscCommon.c_oClipboardPastedFrom.Word && pPr.msoWordSection && "section-break" === pPr["mso-break-type"]) {
 						//section break
-						oThis._Add_NewParagraph();
-						var oSectPr = new CSectionPr(oThis.oLogicDocument);
-						var msoWordSection = oThis._findElemFromMsoHeadStyle("@page", pPr.msoWordSection);
-						if (msoWordSection && msoWordSection[0]) {
-							var sMsoColumns = msoWordSection[0]["mso-columns"];
-							if (sMsoColumns) {
-								var msoColumns = sMsoColumns.split(" ");
-								oSectPr.Set_Columns_Num(msoColumns[0]);
-								if (msoColumns[2]) {
-									oSectPr.Set_Columns_Space(AscCommon.valueToMmType(msoColumns[2]).val);
+						if (oThis.oMsoSections && oThis.oMsoSections[pPr.msoWordSection]) {
+							var oSectPr = new CSectionPr(oThis.oLogicDocument);
+							var msoWordSection = oThis._findElemFromMsoHeadStyle("@page", pPr.msoWordSection);
+							if (msoWordSection && msoWordSection[0]) {
+								var sMsoColumns = msoWordSection[0]["mso-columns"];
+								//columns count + space
+								if (sMsoColumns) {
+									var msoColumns = sMsoColumns.split(" ");
+									oSectPr.Set_Columns_Num(msoColumns[0]);
+									if (msoColumns[2]) {
+										oSectPr.Set_Columns_Space(AscCommon.valueToMmType(msoColumns[2]).val);
+									}
 								}
+								//columns margin
+								var sMargins = msoWordSection[0]["margin"];
+								if (sMargins) {
+									var margins = sMargins.split(" ");
+									var _l = margins[0] && AscCommon.valueToMmType(margins[0]);
+									var _t = margins[1] && AscCommon.valueToMmType(margins[1]);
+									var _r = margins[2] && AscCommon.valueToMmType(margins[2]);
+									var _b = margins[3] && AscCommon.valueToMmType(margins[3]);
+									oSectPr.SetPageMargins(_l ? _l.val : undefined, _t ? _t.val : undefined, _r ? _r.val : undefined, _b ? _b.val : undefined);
+								}
+								/*var sPageSize = msoWordSection[0]["size"];
+								if (sPageSize) {
+									var pageSize = sPageSize.split(" ");
+									var _w = pageSize[0] && AscCommon.valueToMmType(pageSize[0]);
+									var _h = pageSize[1] && AscCommon.valueToMmType(pageSize[1]);
+									oSectPr.SetPageSize(_w ? _w.val : undefined, _h ? _h.val : undefined);
+								}*/
 							}
-							var sMargins = msoWordSection[0]["margin"];
-							if (sMargins) {
-								var margins = sMargins.split(" ");
-								var _l = margins[0] && AscCommon.valueToMmType(margins[0]);
-								var _t = margins[1] && AscCommon.valueToMmType(margins[1]);
-								var _r = margins[2] && AscCommon.valueToMmType(margins[2]);
-								var _b = margins[3] && AscCommon.valueToMmType(margins[3]);
-								oSectPr.SetPageMargins(_l ? _l.val : undefined, _t ? _t.val : undefined, _r ? _r.val : undefined, _b ? _b.val : undefined);
-							}
-							var sPageSize = msoWordSection[0]["size"];
-							if (sPageSize) {
-								var pageSize = sPageSize.split(" ");
-								var _w = pageSize[0] && AscCommon.valueToMmType(pageSize[0]);
-								var _h = pageSize[1] && AscCommon.valueToMmType(pageSize[1]);
-								//oSectPr.SetPageSize(_w ? _w.val : undefined, _h ? _h.val : undefined);
-							}
+							//oSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
+
+							var columnProps = new CDocumentColumnsProps();
+							columnProps.From_SectPr(oSectPr);
+							oThis.oMsoSections[pPr.msoWordSection].columnProps = columnProps;
+							oThis.oMsoSections[pPr.msoWordSection].end = oThis.aContent.length;
 						}
-						oSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
-						oThis.oCurPar.Set_SectionPr(oSectPr, true);
-						//oThis.previousMsoWordSecion = pPr.msoWordSection;
-						if (oThis.section && oThis.section[pPr.msoWordSection]) {
-							oThis.section[pPr.msoWordSection].end = oThis.aContent.length;
-						}
+
 						pPr.msoWordSection = null;
 					} else if (bPageBreakBefore) {
 						bAddParagraph = oThis._Decide_AddParagraph(node.parentNode, pPr, bAddParagraph);
@@ -9287,8 +9277,8 @@ PasteProcessor.prototype =
 					oThis._Execute(child, Common_CopyObj(pPr), false, bAddParagraph, bIsBlockChild || bInBlock);
 
 				if (oThis.previousMsoWordSecion && oThis.previousMsoWordSecion === pPr.msoWordSection) {
-					if (oThis.section && oThis.section[pPr.msoWordSection]) {
-						oThis.section[pPr.msoWordSection].end = oThis.aContent.length;
+					if (oThis.oMsoSections && oThis.oMsoSections[pPr.msoWordSection]) {
+						oThis.oMsoSections[pPr.msoWordSection].end = oThis.aContent.length;
 					}
 					pPr.msoWordSection = null;
 				}
@@ -9453,23 +9443,12 @@ PasteProcessor.prototype =
 			//TODO пока не используется, поскольку есть проблемы при вставке колонок
 			if (AscCommon.g_clipboardBase.pastedFrom === AscCommon.c_oClipboardPastedFrom.Word) {
 				if (child.className && -1 !== child.className.indexOf("WordSection")) {
-					if (!oThis.section) {
-						oThis.section = {};
+					if (!oThis.oMsoSections) {
+						oThis.oMsoSections = {};
 					}
 					pPr.msoWordSection = child.className;
-					oThis.section[pPr.msoWordSection] = {start: oThis.aContent.length};
-				}/*else {
-					if (child.className) {
-						if (oThis.previousMsoWordSecion) {
-							oThis._Add_NewParagraph();
-							var oSectPr = new CSectionPr(oThis.oLogicDocument);
-							oSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
-							oThis.oCurPar.Set_SectionPr(oSectPr, true);
-
-							oThis.previousMsoWordSecion = null;
-						}
-					}
-				}*/
+					oThis.oMsoSections[pPr.msoWordSection] = {start: oThis.aContent.length};
+				}
 			}
 
 			parseChildNodes();
