@@ -2442,6 +2442,8 @@ PasteProcessor.prototype =
 		//TODO пересмотреть pasteTypeContent
 		this.pasteTypeContent = null;
 		var oSelectedContent = new CSelectedContent();
+		oSelectedContent.LastSection = this.getLastSectionPr();
+
 		var tableSpecialPaste = false;
 
 		if (oTable && !aNewContent[0].IsTable() && oTable.IsCellSelection())
@@ -5061,7 +5063,6 @@ PasteProcessor.prototype =
 	_applyMsoSections: function (aContent, sections) {
 		if (sections) {
 			for (var i in sections) {
-
 				var columnsProps = sections[i].columnProps;
 				var nStartPos = sections[i].start;
 				var nEndPos = sections[i].end;
@@ -5070,7 +5071,7 @@ PasteProcessor.prototype =
 					nEndPos = sections[i].start;
 				}
 
-				var nStartPosSelection = this.oLogicDocument.Selection.StartPos;
+				/*var nStartPosSelection = this.oLogicDocument.Selection.StartPos;
 				var nEndPosSelection = this.oLogicDocument.Selection.EndPos;
 				if (nEndPosSelection < nStartPosSelection) {
 					nStartPosSelection = this.oLogicDocument.Selection.EndPos;
@@ -5115,7 +5116,7 @@ PasteProcessor.prototype =
 				} else {
 					oEndSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
 					oEndSectPr.SetColumnProps(columnsProps);
-				}
+				}*/
 
 				for (var nIndex = nStartPos; nIndex < nEndPos; ++nIndex) {
 					var oElement = aContent[nIndex];
@@ -5129,6 +5130,66 @@ PasteProcessor.prototype =
 			}
 		}
 	},
+
+	getMsoSectionPr: function (prefix, sectionName) {
+		var oSectPr = new CSectionPr(this.oLogicDocument);
+		var msoWordSection = this._findElemFromMsoHeadStyle(prefix, sectionName);
+		if (msoWordSection && msoWordSection[0]) {
+			var sMsoColumns = msoWordSection[0]["mso-columns"];
+			//columns count + space
+			if (sMsoColumns) {
+				var msoColumns = sMsoColumns.split(" ");
+				oSectPr.Set_Columns_Num(msoColumns[0]);
+				if (msoColumns[2]) {
+					oSectPr.Set_Columns_Space(AscCommon.valueToMmType(msoColumns[2]).val);
+				}
+			}
+			//columns margin
+			var sMargins = msoWordSection[0]["margin"];
+			if (sMargins) {
+				var margins = sMargins.split(" ");
+				var _l = margins[0] && AscCommon.valueToMmType(margins[0]);
+				var _t = margins[1] && AscCommon.valueToMmType(margins[1]);
+				var _r = margins[2] && AscCommon.valueToMmType(margins[2]);
+				var _b = margins[3] && AscCommon.valueToMmType(margins[3]);
+				oSectPr.SetPageMargins(_l ? _l.val : undefined, _t ? _t.val : undefined, _r ? _r.val : undefined, _b ? _b.val : undefined);
+			}
+			/*var sPageSize = msoWordSection[0]["size"];
+			if (sPageSize) {
+				var pageSize = sPageSize.split(" ");
+				var _w = pageSize[0] && AscCommon.valueToMmType(pageSize[0]);
+				var _h = pageSize[1] && AscCommon.valueToMmType(pageSize[1]);
+				oSectPr.SetPageSize(_w ? _w.val : undefined, _h ? _h.val : undefined);
+			}*/
+		}
+		//oSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
+
+		return oSectPr;
+	},
+
+	getLastSectionPr: function () {
+		var lastSectionIndex = 0;
+
+		if (this.oMsoSections) {
+			for (var i in this.oMsoSections) {
+				var curSection = i.split("WordSection");
+				if (curSection && curSection[1]) {
+					var curIndex = parseInt(curSection[1]);
+					if (curIndex && !isNaN(curIndex) && curIndex > lastSectionIndex) {
+						lastSectionIndex = curIndex;
+					}
+				}
+			}
+		}
+
+		var oSectPr = null;
+		if (lastSectionIndex) {
+			oSectPr = this.getMsoSectionPr("@page", "WordSection" + (lastSectionIndex + 1));
+		}
+
+		return oSectPr;
+	},
+
 
 	_getClassBinaryFromHtml: function (node, onlyBinary) {
 		var classNode, base64FromExcel = null, base64FromWord = null, base64FromPresentation = null;
@@ -8972,37 +9033,7 @@ PasteProcessor.prototype =
 					if (AscCommon.g_clipboardBase.pastedFrom === AscCommon.c_oClipboardPastedFrom.Word && pPr.msoWordSection && "section-break" === pPr["mso-break-type"]) {
 						//section break
 						if (oThis.oMsoSections && oThis.oMsoSections[pPr.msoWordSection]) {
-							var oSectPr = new CSectionPr(oThis.oLogicDocument);
-							var msoWordSection = oThis._findElemFromMsoHeadStyle("@page", pPr.msoWordSection);
-							if (msoWordSection && msoWordSection[0]) {
-								var sMsoColumns = msoWordSection[0]["mso-columns"];
-								//columns count + space
-								if (sMsoColumns) {
-									var msoColumns = sMsoColumns.split(" ");
-									oSectPr.Set_Columns_Num(msoColumns[0]);
-									if (msoColumns[2]) {
-										oSectPr.Set_Columns_Space(AscCommon.valueToMmType(msoColumns[2]).val);
-									}
-								}
-								//columns margin
-								var sMargins = msoWordSection[0]["margin"];
-								if (sMargins) {
-									var margins = sMargins.split(" ");
-									var _l = margins[0] && AscCommon.valueToMmType(margins[0]);
-									var _t = margins[1] && AscCommon.valueToMmType(margins[1]);
-									var _r = margins[2] && AscCommon.valueToMmType(margins[2]);
-									var _b = margins[3] && AscCommon.valueToMmType(margins[3]);
-									oSectPr.SetPageMargins(_l ? _l.val : undefined, _t ? _t.val : undefined, _r ? _r.val : undefined, _b ? _b.val : undefined);
-								}
-								/*var sPageSize = msoWordSection[0]["size"];
-								if (sPageSize) {
-									var pageSize = sPageSize.split(" ");
-									var _w = pageSize[0] && AscCommon.valueToMmType(pageSize[0]);
-									var _h = pageSize[1] && AscCommon.valueToMmType(pageSize[1]);
-									oSectPr.SetPageSize(_w ? _w.val : undefined, _h ? _h.val : undefined);
-								}*/
-							}
-							//oSectPr.Set_Type(c_oAscSectionBreakType.Continuous);
+							var oSectPr = oThis.getMsoSectionPr("@page", pPr.msoWordSection);
 
 							var columnProps = new CDocumentColumnsProps();
 							columnProps.From_SectPr(oSectPr);
