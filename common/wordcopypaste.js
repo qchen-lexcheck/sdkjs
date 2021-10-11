@@ -2442,7 +2442,7 @@ PasteProcessor.prototype =
 		//TODO пересмотреть pasteTypeContent
 		this.pasteTypeContent = null;
 		var oSelectedContent = new CSelectedContent();
-		oSelectedContent.LastSection = this.getLastSectionPr();
+		oSelectedContent.SetLastSection(this.getLastSectionPr());
 
 		var tableSpecialPaste = false;
 
