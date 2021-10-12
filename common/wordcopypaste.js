@@ -2188,11 +2188,12 @@ function sendImgUrls(api, images, callback, bExcel, bNotShowError, token) {
       nError = c_oAscError.ID.Unknown;
     }
     if ( c_oAscError.ID.No !== nError && !bNotShowError) {
-      if(!bExcel)
-        api.sendEvent("asc_onError", nError, c_oAscError.Level.NoCritical);
-      else
-        api.handlers.trigger("asc_onError", nError, c_oAscError.Level.NoCritical);
-    }
+		if (!bExcel) {
+			api.sendEvent("asc_onError", nError, c_oAscError.Level.NoCritical);
+		} else {
+			api.handlers.trigger("asc_onError", nError, c_oAscError.Level.NoCritical);
+		}
+	}
     if (!data) {
       //todo сделать функцию очистки, чтобы можно было оборвать paste и показать error
       data = [];
@@ -9024,10 +9025,28 @@ PasteProcessor.prototype =
 									oThis.oCurRun.Pr.Underline = false;
 								}
 
-								var Drawing = CreateImageFromBinary(sSrc, nWidth, nHeight);
-								// oTargetDocument.DrawingObjects.Add( Drawing );
+								//TODO сделать враппер ContentControl временным
+								//TODO проверить вставку картинки с гиперссылкой
+								var Drawing;
+								if ("error" === sSrc) {
+									//создадим placeholder
+									var oCC = oThis.oCurPar.AddContentControl(c_oAscSdtLevelType.Inline);
+									oCC.SetPlaceholderText(AscCommon.translateManager.getValue("Click to load image"));
+									oCC.ApplyPicturePr(true, nWidth, nHeight);
+									var oFormPr = new CSdtFormPr();
+									if (oCC && oFormPr)
+									{
+										oCC.SetFormPr(oFormPr);
+										oCC.UpdatePlaceHolderTextPrForForm();
+										//oCC.ConvertFormToFixed();
+										oCC.SetPictureFormPr(new AscCommon.CSdtPictureFormPr());
+									}
+								} else {
+									Drawing = CreateImageFromBinary(sSrc, nWidth, nHeight);
+									oThis._AddToParagraph(Drawing);
+								}
 
-								oThis._AddToParagraph(Drawing);
+								// oTargetDocument.DrawingObjects.Add( Drawing );
 
 								if (oThis.oCurHyperlink) {
 									oThis.oCurRun = new ParaRun(oThis.oCurPar);
