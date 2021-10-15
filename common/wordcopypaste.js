@@ -9033,9 +9033,9 @@ PasteProcessor.prototype =
 									var oCC = oThis.oCurPar.AddContentControl(c_oAscSdtLevelType.Inline);
 									oCC.SetPlaceholderText(AscCommon.translateManager.getValue("Click to load image"));
 									oCC.ApplyPicturePr(true, nWidth, nHeight);
+									oCC.SetContentControlTemporary(true);
 									var oFormPr = new CSdtFormPr();
-									if (oCC && oFormPr)
-									{
+									if (oCC && oFormPr) {
 										oCC.SetFormPr(oFormPr);
 										oCC.UpdatePlaceHolderTextPrForForm();
 										//oCC.ConvertFormToFixed();
