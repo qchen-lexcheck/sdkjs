@@ -408,6 +408,11 @@ CHistory.prototype.Can_Redo = function()
 	return this.Points.length > 0 && this.Index < this.Points.length - 1;
 };
 /** @returns {boolean} */
+CHistory.prototype.Can_Repeat = function()
+{
+	return this.Points.length > 0 && this.Index === this.Points.length - 1;
+};
+/** @returns {boolean} */
 CHistory.prototype.Undo = function(Options)
 {
   // Проверяем можно ли сделать Undo
@@ -543,6 +548,30 @@ CHistory.prototype.RedoAdd = function(oRedoObjectParam, Class, Type, sheetid, ra
     }
 	if (bChangeActive) {
 		oRedoObjectParam.activeSheet = this.workbook.getActiveWs().getId();
+	}
+};
+CHistory.prototype.Repeat = function()
+{
+	var lastPoint = this.Points[this.Index];
+	var classType = null, itemType = null;
+	if (lastPoint && lastPoint.Items) {
+		//проверяем на наличие простых одинаковых действий в истории
+		for (var Index = 0; Index < lastPoint.Items.length; Index++) {
+			var Item = lastPoint.Items[Index];
+			if (classType === null) {
+				classType = Item.Class.nType;
+				itemType = itemType.Type;
+			} else if (!(Item.Class.nType === classType && Item.type === itemType.Type)) {
+				classType = null;
+				itemType = null;
+				break;
+			}
+		}
+	}
+
+	//если все действия одинаковые
+	if (null !== classType) {
+
 	}
 };
 
@@ -717,8 +746,12 @@ CHistory.prototype.UndoRedoEnd = function (Point, oRedoObjectParam, bUndo) {
 CHistory.prototype.Redo = function()
 {
 	// Проверяем можно ли сделать Redo
-	if ( true != this.Can_Redo() )
+	if ( true != this.Can_Redo() ) {
+		if (true == this.Can_Repeat()) {
+			this.Repeat();
+		}
 		return;
+	}
 
 	var oRedoObjectParam = new AscCommonExcel.RedoObjectParam();
 	this.UndoRedoPrepare(oRedoObjectParam, false);
