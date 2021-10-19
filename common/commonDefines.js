@@ -185,12 +185,13 @@
 			FTRangeIncludedOtherTables       : -57,
 			ChangeFilteredRangeError         : -58,
 
-			PasteMaxRangeError   : -64,
-			PastInMergeAreaError : -65,
+			PasteMaxRangeError       : -64,
+			PastInMergeAreaError     : -65,
 			CopyMultiselectAreaError : -66,
-			PasteSlicerError: 67,
-			MoveSlicerError: 68,
-			PasteMultiSelectError : -69,
+			UplImageUrlOnPaste       : -67,
+			PasteSlicerError         : 67,
+			MoveSlicerError          : 68,
+			PasteMultiSelectError    : -69,
 
 			DataRangeError   : -75,
 			CannotMoveRange  : -74,
@@ -2349,6 +2350,7 @@
 	prot['PasteMaxRangeError']               = prot.PasteMaxRangeError;
 	prot['PastInMergeAreaError']             = prot.PastInMergeAreaError;
 	prot['CopyMultiselectAreaError']         = prot.CopyMultiselectAreaError;
+	prot['UplImageUrlOnPaste']               = prot.UplImageUrlOnPaste;
 	prot['PasteSlicerError']                 = prot.PasteSlicerError;
 	prot['MoveSlicerError']                  = prot.MoveSlicerError;
 	prot['PasteMultiSelectError']            = prot.PasteMultiSelectError;

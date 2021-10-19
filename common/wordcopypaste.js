@@ -2188,6 +2188,9 @@ function sendImgUrls(api, images, callback, bExcel, bNotShowError, token) {
       nError = c_oAscError.ID.Unknown;
     }
     if ( c_oAscError.ID.No !== nError && !bNotShowError) {
+		if (nError === c_oAscError.ID.UplImageUrl) {
+			nError = c_oAscError.ID.UplImageUrlOnPaste;
+		}
 		if (!bExcel) {
 			api.sendEvent("asc_onError", nError, c_oAscError.Level.NoCritical);
 		} else {
@@ -6223,7 +6226,7 @@ PasteProcessor.prototype =
 						}
 					}
 					fCallback(aPrepeareFonts, image_map);
-				}, null, true);
+				}, null, null);
 			} else {
 				fCallback(aPrepeareFonts, this.oImages);
 			}
