@@ -361,13 +361,15 @@ function CHistory()
 	this.CanNotAddChanges = false;//флаг для отслеживания ошибок добавления изменений без точки:Create_NewPoint->Add->Save_Changes->Add
 
 	this.SavedIndex = null;			// Номер точки отката, на которой произошло последнее сохранение
-  this.ForceSave  = false;       // Нужно сохранение, случается, когда у нас точка SavedIndex смещается из-за объединения точек, и мы делаем Undo
+	this.ForceSave = false;       // Нужно сохранение, случается, когда у нас точка SavedIndex смещается из-за объединения точек, и мы делаем Undo
 
-  // Параметры для специального сохранения для локальной версии редактора
-  this.UserSaveMode   = false;
-  this.UserSavedIndex = null;  // Номер точки, на которой произошло последнее сохранение пользователем (не автосохранение)
+	// Параметры для специального сохранения для локальной версии редактора
+	this.UserSaveMode = false;
+	this.UserSavedIndex = null;  // Номер точки, на которой произошло последнее сохранение пользователем (не автосохранение)
 
 	this.PosInCurPoint = null; // position to roll back changes within the current point
+	this.LastSimpleAction = null;
+
 }
 CHistory.prototype.init = function(workbook) {
 	this.workbook = workbook;
@@ -410,7 +412,7 @@ CHistory.prototype.Can_Redo = function()
 /** @returns {boolean} */
 CHistory.prototype.Can_Repeat = function()
 {
-	return this.Points.length > 0 && this.Index === this.Points.length - 1;
+	return this.LastSimpleAction !== null;
 };
 /** @returns {boolean} */
 CHistory.prototype.Undo = function(Options)
@@ -552,6 +554,16 @@ CHistory.prototype.RedoAdd = function(oRedoObjectParam, Class, Type, sheetid, ra
 };
 CHistory.prototype.Repeat = function()
 {
+	if (!this.LastSimpleAction) {
+		return;
+	}
+	var itemType = this.LastSimpleAction.itemType;
+	var classType = this.LastSimpleAction.classType;
+
+	window["Asc"]["editor"].wb.applySimpleAction();
+};
+CHistory.prototype.AddLastSimpleAction = function()
+{
 	var lastPoint = this.Points[this.Index];
 	var classType = null, itemType = null;
 	if (lastPoint && lastPoint.Items) {
@@ -560,7 +572,7 @@ CHistory.prototype.Repeat = function()
 			var Item = lastPoint.Items[Index];
 			if (classType === null) {
 				classType = Item.Class.nType;
-				itemType = itemType.Type;
+				itemType = Item.Type;
 			} else if (!(Item.Class.nType === classType && Item.type === itemType.Type)) {
 				classType = null;
 				itemType = null;
@@ -568,10 +580,9 @@ CHistory.prototype.Repeat = function()
 			}
 		}
 	}
-
 	//если все действия одинаковые
 	if (null !== classType) {
-
+		this.LastSimpleAction = {classType: classType, itemType: itemType};
 	}
 };
 
@@ -1145,6 +1156,7 @@ CHistory.prototype.EndTransaction = function()
 		this.Transaction = 0;
 	if (this.IsEndTransaction() && this.workbook) {
 		this.workbook.dependencyFormulas.unlockRecal();
+		this.AddLastSimpleAction();
 	}
 };
 /** @returns {boolean} */
