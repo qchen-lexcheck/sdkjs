@@ -4135,28 +4135,11 @@
 		return (BinaryLen + ";" + oWriter.GetBase64Memory2(BinaryPos, BinaryLen));
 	};
 
-	WorkbookView.prototype.applyRepeatAction = function () {
-
-		var oWs = this.getActiveWS();
-		var id = oWs.getId();
-		var selection = oWs.getSelection();
-		var isEdit = this.getCellEditMode();
-
-		var rangeStr = "";
-		for (var i = 0; i < selection.ranges.length; i++) {
-			var _range = selection.ranges[i];
-			rangeStr += _range.c1 + "," + _range.r1 + "," + _range.c2 + "," + _range.r2 + ",";
+	WorkbookView.prototype.applyRepeatAction = function (prop, val) {
+		var ws = this.getWorksheet();
+		if (ws) {
+			ws.setSelectionInfo(prop, val);
 		}
-
-		var oWriter = new AscCommon.CMemory(true);
-		oWriter.CheckSize(50);
-
-		var BinaryPos = oWriter.GetCurPosition();
-		oWriter.WriteString2(id);
-		oWriter.WriteBool(isEdit);
-		oWriter.WriteString2(rangeStr);
-		var BinaryLen = oWriter.GetCurPosition() - BinaryPos;
-		return (BinaryLen + ";" + oWriter.GetBase64Memory2(BinaryPos, BinaryLen));
 	};
 
 	//------------------------------------------------------------export---------------------------------------------------

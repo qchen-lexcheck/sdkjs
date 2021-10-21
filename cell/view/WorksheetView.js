@@ -11261,6 +11261,9 @@
             if (false === isSuccess) {
                 return;
             }
+
+			History.AddLastSimpleAction(prop, val);
+
             var hasUpdates = false;
 
             var callTrigger = false;

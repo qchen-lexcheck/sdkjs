@@ -557,33 +557,12 @@ CHistory.prototype.Repeat = function()
 	if (!this.LastSimpleAction) {
 		return;
 	}
-	var itemType = this.LastSimpleAction.itemType;
-	var classType = this.LastSimpleAction.classType;
 
-	window["Asc"]["editor"].wb.applySimpleAction();
+	window["Asc"]["editor"].wb.applyRepeatAction(this.LastSimpleAction.prop, this.LastSimpleAction.val);
 };
-CHistory.prototype.AddLastSimpleAction = function()
+CHistory.prototype.AddLastSimpleAction = function(prop, val)
 {
-	var lastPoint = this.Points[this.Index];
-	var classType = null, itemType = null;
-	if (lastPoint && lastPoint.Items) {
-		//проверяем на наличие простых одинаковых действий в истории
-		for (var Index = 0; Index < lastPoint.Items.length; Index++) {
-			var Item = lastPoint.Items[Index];
-			if (classType === null) {
-				classType = Item.Class.nType;
-				itemType = Item.Type;
-			} else if (!(Item.Class.nType === classType && Item.type === itemType.Type)) {
-				classType = null;
-				itemType = null;
-				break;
-			}
-		}
-	}
-	//если все действия одинаковые
-	if (null !== classType) {
-		this.LastSimpleAction = {classType: classType, itemType: itemType};
-	}
+	this.LastSimpleAction = {prop: prop, val: val};
 };
 
 CHistory.prototype.Remove_LastPoint = function()
@@ -1156,7 +1135,6 @@ CHistory.prototype.EndTransaction = function()
 		this.Transaction = 0;
 	if (this.IsEndTransaction() && this.workbook) {
 		this.workbook.dependencyFormulas.unlockRecal();
-		this.AddLastSimpleAction();
 	}
 };
 /** @returns {boolean} */
