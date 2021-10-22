@@ -2049,6 +2049,14 @@
 	{
 		return AscCommon.History.Can_Redo();
 	};
+	baseEditorsApi.prototype.CanRepeat = function()
+	{
+		return AscCommon.History.Can_Repeat();
+	};
+	baseEditorsApi.prototype.Repeat = function()
+	{
+		return AscCommon.History.Repeat();
+	};
 	// Offline mode
 	baseEditorsApi.prototype.asc_isOffline  = function()
 	{

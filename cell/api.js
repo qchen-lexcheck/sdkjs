@@ -6184,6 +6184,10 @@ var editor;
 		this.sendEvent("asc_onHideForeignCursorLabel", UserId);
 	};
 
+	spreadsheet_api.prototype.hideForeignSelectLabel = function (UserId) {
+		this.sendEvent("asc_onHideForeignCursorLabel", UserId);
+	};
+
   /*
    * Export
    * -----------------------------------------------------------------------------

@@ -14075,6 +14075,9 @@
 				return;
 			}
 
+			if (prop !== "update") {
+				History.AddLastSimpleAction(prop, val);
+			}
 			asc_applyFunction(functionModelAction);
 
 			t._initCellsArea(oRecalcType);

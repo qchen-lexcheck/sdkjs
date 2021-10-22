@@ -737,8 +737,8 @@ CHistory.prototype.Redo = function()
 {
 	// Проверяем можно ли сделать Redo
 	if ( true != this.Can_Redo() ) {
-		if (true == this.Can_Repeat()) {
-			this.Repeat();
+		if (true == this.workbook.oApi.CanRepeat()) {
+			this.workbook.oApi.Repeat();
 		}
 		return;
 	}

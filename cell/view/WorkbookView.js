@@ -4135,10 +4135,41 @@
 		return (BinaryLen + ";" + oWriter.GetBase64Memory2(BinaryPos, BinaryLen));
 	};
 
+
+	//"sort"? locked ? indent?
+	var allowChangeSelectionInfoSimpleActions = {
+		"style": 1,
+		"changeFontSize": 1,
+		"changeDigNum": 1,
+		"empty": 1,
+		"merge": 1,
+		"border": 1,
+		"angle": 1,
+		"format": 1,
+		"shrink": 1,
+		"wrap": 1,
+		"bc": 1,
+		"f": 1,
+		"c": 1,
+		"va": 1,
+		"a": 1,
+		"fa": 1,
+		"s": 1,
+		"u": 1,
+		"i": 1,
+		"b": 1,
+		"fs": 1,
+		"fn": 1
+	};
+	var allowChangeWorksheetSimpleActions = {"colWidth": 1};
 	WorkbookView.prototype.applyRepeatAction = function (prop, val) {
 		var ws = this.getWorksheet();
 		if (ws) {
-			ws.setSelectionInfo(prop, val);
+			if (allowChangeSelectionInfoSimpleActions[prop]) {
+				ws.setSelectionInfo(prop, val);
+			} else if (allowChangeWorksheetSimpleActions[prop]) {
+				ws.changeWorksheet(prop, val);
+			}
 		}
 	};
 
