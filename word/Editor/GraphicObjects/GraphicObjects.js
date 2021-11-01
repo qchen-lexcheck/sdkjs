@@ -2467,12 +2467,10 @@ CGraphicObjects.prototype =
         var page;
         if(content.IsHdrFtr())
         {
-            page = this.getHdrFtrObjectsByPageIndex(pageIndex);
+            //we draw objects from header/footer in drawBehindDocHdrFtr
+            return;
         }
-        else
-        {
-            page = this.graphicPages[pageIndex];
-        }
+        page = this.graphicPages[pageIndex];
         page && page.drawBehindObjectsByContent(graphics, content)
     },
 
@@ -2481,12 +2479,10 @@ CGraphicObjects.prototype =
         var page;
         if(content.IsHdrFtr())
         {
-            page = this.getHdrFtrObjectsByPageIndex(pageIndex);
+            //we draw objects from header/footer in drawBeforeDocHdrFtr
+            return;
         }
-        else
-        {
-            page = this.graphicPages[pageIndex];
-        }
+        page = this.graphicPages[pageIndex];
         page && page.drawBeforeObjectsByContent(graphics, content)
     },
 
@@ -2557,7 +2553,7 @@ CGraphicObjects.prototype =
     },
 
     handleDblClickEmptyShape: function(oShape){
-        if(!oShape.getDocContent() && !AscFormat.CheckLinePresetForParagraphAdd(oShape.getPresetGeom())){
+        if(!oShape.getDocContent() && oShape.canEditText()){
 
             if(false === this.document.Document_Is_SelectionLocked(changestype_Drawing_Props))
             {
@@ -4349,6 +4345,10 @@ CGraphicObjects.prototype.documentIsSelectionLocked = function(CheckType)
 
     if (oDocContent)
         oDocContent.Document_Is_SelectionLocked(CheckType);
+};
+CGraphicObjects.prototype.getAnimationPlayer = function()
+{
+    return null;
 };
 
 function ComparisonByZIndexSimpleParent(obj1, obj2)

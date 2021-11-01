@@ -422,6 +422,9 @@
 				ws.getId(), this.getUnionRange(location), new AscCommonExcel.UndoRedoData_CF(this.id, getUndoRedoRange(this.ranges), getUndoRedoRange(location)));
 		}
 		this.ranges = location;
+		if (ws) {
+			ws.cleanConditionalFormattingRangeIterator();
+		}
 	};
 
 	CConditionalFormattingRule.prototype.checkProperty = function (propOld, propNew, type, ws, addToHistory) {
@@ -1091,6 +1094,12 @@
 				this.text = null;
 				this.rank = null;
 				break;
+			case Asc.ECfType.colorScale:
+				this.dxf = null;
+				break;
+		}
+		if (this.type !== Asc.ECfType.top10) {
+			this.rank = null;
 		}
 	};
 	CConditionalFormattingRule.prototype.asc_setDxf = function (val) {

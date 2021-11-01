@@ -40,9 +40,6 @@
 function (window, undefined) {
 
 // Import
-var g_memory = AscFonts.g_memory;
-var DecodeBase64Char = AscFonts.DecodeBase64Char;
-var b64_decode = AscFonts.b64_decode;
 
 var c_oAscSizeRelFromH = AscCommon.c_oAscSizeRelFromH;
 var c_oAscSizeRelFromV = AscCommon.c_oAscSizeRelFromV;
@@ -62,7 +59,7 @@ var c_oAscFill = Asc.c_oAscFill;
 
 function CheckObjectLine(obj)
 {
-    return (obj instanceof CShape && obj.spPr && obj.spPr.geometry && AscFormat.CheckLinePreset(obj.spPr.geometry.preset));
+    return (obj instanceof CShape && obj.spPr && obj.spPr.geometry && AscFormat.CheckLinePresetForParagraphAdd(obj.spPr.geometry.preset));
 }
 
 
@@ -1273,7 +1270,7 @@ CShape.prototype.createTextBoxContent = function () {
 CShape.prototype.paragraphAdd = function (paraItem, bRecalculate) {
     var content_to_add = this.getDocContent();
     if (!content_to_add) {
-        if(!AscFormat.CheckLinePresetForParagraphAdd(this.getPresetGeom())) {
+        if(this.canEditText()) {
             if (this.bWordShape) {
                 this.createTextBoxContent();
             }
@@ -1293,7 +1290,7 @@ CShape.prototype.applyTextFunction = function (docContentFunction, tableFunction
     var content_to_add = this.getDocContent();
     if (!content_to_add)
     {
-        if(!AscFormat.CheckLinePresetForParagraphAdd(this.getPresetGeom())) {
+        if(this.canEditText()) {
 
             if (this.bWordShape)
             {
@@ -1359,6 +1356,7 @@ CShape.prototype.getBodyPr = function () {
         }
     }, this, []);
 };
+
 
 CShape.prototype.GetRevisionsChangeElement = function(SearchEngine){
     var oContent = this.getDocContent();
@@ -1805,7 +1803,7 @@ CShape.prototype.getPhIndex = function () {
 CShape.prototype.setVerticalAlign = function (align) {
     var content_to_add = this.getDocContent();
     if (!content_to_add) {
-        if(!AscFormat.CheckLinePresetForParagraphAdd(this.getPresetGeom())) {
+        if(this.canEditText()) {
             if (this.bWordShape) {
                 this.createTextBoxContent();
             }
@@ -1831,7 +1829,7 @@ CShape.prototype.setVerticalAlign = function (align) {
 CShape.prototype.setVert = function (vert) {
     var content_to_add = this.getDocContent();
     if (!content_to_add) {
-        if(!AscFormat.CheckLinePresetForParagraphAdd(this.getPresetGeom())) {
+        if(this.canEditText()) {
             if (this.bWordShape) {
                 this.createTextBoxContent();
             }
@@ -2921,6 +2919,12 @@ CShape.prototype.fillObject = function(copy, oPr){
     if(this.textLink !== null) {
         copy.setTextLink(this.textLink);
     }
+    if(this.clientData) {
+        copy.setClientData(this.clientData.createDuplicate());
+    }
+    if(this.fLocksText !== null) {
+        copy.setFLocksText(this.fLocksText);
+    }
     copy.setWordShape(this.bWordShape);
     copy.setBDeleted(this.bDeleted);
     copy.setLocks(this.locks);
@@ -2933,6 +2937,9 @@ CShape.prototype.copy = function (oPr) {
     var copy = new CShape();
     this.fillObject(copy, oPr);
     return copy;
+};
+CShape.prototype.getProtectionLockText = function () {
+    return this.fLocksText !== false;
 };
 
 CShape.prototype.Get_Styles = function (level) {
@@ -4923,6 +4930,10 @@ CShape.prototype.draw = function (graphics, transform, transformText, pageIndex)
             return;
         }
     }
+    if(graphics.animationDrawer) {
+        graphics.animationDrawer.drawObject(this, graphics);
+        return;
+    }
 
     var _transform = transform ? transform : this.transform;
     var _transform_text = transformText ? transformText : this.transformText;
@@ -6486,96 +6497,8 @@ CShape.prototype.getColumnNumber = function(){
 
 function CreateBinaryReader(szSrc, offset, srcLen)
 {
-    var nWritten = 0;
-
-    var index =  -1 + offset;
-    var dst_len = "";
-
-    for( ; index < srcLen; )
-    {
-        index++;
-        var _c = szSrc.charCodeAt(index);
-        if (_c == ";".charCodeAt(0))
-        {
-            index++;
-            break;
-        }
-
-        dst_len += String.fromCharCode(_c);
-    }
-
-    var dstLen = parseInt(dst_len);
-    if(isNaN(dstLen))
-        return null;
-    var pointer = g_memory.Alloc(dstLen);
-    var stream = new AscCommon.FT_Stream2(pointer.data, dstLen);
-    stream.obj = pointer.obj;
-
-    var dstPx = stream.data;
-
-    if (window.chrome)
-    {
-        while (index < srcLen)
-        {
-            var dwCurr = 0;
-            var i;
-            var nBits = 0;
-            for (i=0; i<4; i++)
-            {
-                if (index >= srcLen)
-                    break;
-                var nCh = DecodeBase64Char(szSrc.charCodeAt(index++));
-                if (nCh == -1)
-                {
-                    i--;
-                    continue;
-                }
-                dwCurr <<= 6;
-                dwCurr |= nCh;
-                nBits += 6;
-            }
-
-            dwCurr <<= 24-nBits;
-            for (i=0; i<nBits/8; i++)
-            {
-                dstPx[nWritten++] = ((dwCurr & 0x00ff0000) >>> 16);
-                dwCurr <<= 8;
-            }
-        }
-    }
-    else
-    {
-        var p = b64_decode;
-        while (index < srcLen)
-        {
-            var dwCurr = 0;
-            var i;
-            var nBits = 0;
-            for (i=0; i<4; i++)
-            {
-                if (index >= srcLen)
-                    break;
-                var nCh = p[szSrc.charCodeAt(index++)];
-                if (nCh == undefined)
-                {
-                    i--;
-                    continue;
-                }
-                dwCurr <<= 6;
-                dwCurr |= nCh;
-                nBits += 6;
-            }
-
-            dwCurr <<= 24-nBits;
-            for (i=0; i<nBits/8; i++)
-            {
-                dstPx[nWritten++] = ((dwCurr & 0x00ff0000) >>> 16);
-                dwCurr <<= 8;
-            }
-        }
-    }
-
-    return stream;
+    var memoryData = AscCommon.Base64.decode(szSrc, true, srcLen, offset);
+    return new AscCommon.FT_Stream2(memoryData, memoryData.length);
 }
 
 function getParaDrawing(oDrawing)

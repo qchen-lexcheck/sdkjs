@@ -414,6 +414,14 @@ function CEditorPage(api)
 
 		this.OnResize(true);
 
+		// в мобильной версии - при транзишне - не обновляется позиция/размер
+		if (this.m_oApi.isMobileVersion)
+		{
+			var _t = this;
+			document.addEventListener && document.addEventListener("transitionend", function() { _t.OnResize(false);  }, false);
+			document.addEventListener && document.addEventListener("transitioncancel", function() { _t.OnResize(false); }, false);
+		}
+
 		this.checkMouseHandMode();
 	};
 
@@ -1858,13 +1866,6 @@ function CEditorPage(api)
 			return;
 
 		var oWordControl = oThis;
-		if (oWordControl.MouseHandObject && oWordControl.MouseHandObject.Active)
-		{
-			AscCommon.check_MouseUpEvent(e);
-			oWordControl.MouseHandObject.Active = false;
-			oWordControl.m_oDrawingDocument.SetCursorType("grab");
-			return;
-		}
 
 		global_mouseEvent.Type = AscCommon.g_mouse_event_type_up;
 
@@ -1875,6 +1876,13 @@ function CEditorPage(api)
 		global_mouseEvent.UnLockMouse();
 
 		global_mouseEvent.IsPressed = false;
+
+		if (oWordControl.MouseHandObject && oWordControl.MouseHandObject.Active)
+		{
+			oWordControl.MouseHandObject.Active = false;
+			oWordControl.m_oDrawingDocument.SetCursorType("grab");
+			return;
+		}
 
 		if (-1 != oWordControl.m_oTimerScrollSelect)
 		{
@@ -3015,6 +3023,24 @@ function CEditorPage(api)
 
 			ctx.globalAlpha = 1.0;
 
+			// drawShapes (+ track)
+			if (this.m_oLogicDocument.DrawingObjects)
+			{
+				for (var indP = drDoc.m_lDrawingFirst; indP <= drDoc.m_lDrawingEnd; indP++)
+				{
+					this.m_oDrawingDocument.AutoShapesTrack.PageIndex = indP;
+					this.m_oLogicDocument.DrawingObjects.drawSelect(indP);
+				}
+
+				if (this.m_oLogicDocument.DrawingObjects.needUpdateOverlay())
+				{
+					overlay.Show();
+					this.m_oDrawingDocument.AutoShapesTrack.PageIndex = -1;
+					this.m_oLogicDocument.DrawingObjects.drawOnOverlay(this.m_oDrawingDocument.AutoShapesTrack);
+					this.m_oDrawingDocument.AutoShapesTrack.CorrectOverlayBounds();
+				}
+			}
+
 			var _table_outline = drDoc.TableOutlineDr.TableOutline;
 			if (_table_outline != null && !this.MobileTouchManager)
 			{
@@ -3039,24 +3065,6 @@ function CEditorPage(api)
 			}
 
             drDoc.contentControls && drDoc.contentControls.DrawContentControlsTrack(overlay);
-
-			// drawShapes (+ track)
-			if (this.m_oLogicDocument.DrawingObjects)
-			{
-				for (var indP = drDoc.m_lDrawingFirst; indP <= drDoc.m_lDrawingEnd; indP++)
-				{
-					this.m_oDrawingDocument.AutoShapesTrack.PageIndex = indP;
-					this.m_oLogicDocument.DrawingObjects.drawSelect(indP);
-				}
-
-				if (this.m_oLogicDocument.DrawingObjects.needUpdateOverlay())
-				{
-					overlay.Show();
-					this.m_oDrawingDocument.AutoShapesTrack.PageIndex = -1;
-					this.m_oLogicDocument.DrawingObjects.drawOnOverlay(this.m_oDrawingDocument.AutoShapesTrack);
-					this.m_oDrawingDocument.AutoShapesTrack.CorrectOverlayBounds();
-				}
-			}
 
             if (drDoc.placeholders.objects.length > 0)
             {
@@ -3376,7 +3384,7 @@ function CEditorPage(api)
 
 				if (!AscCommon.AscBrowser.isCustomScaling())
 				{
-					this.m_oDrawingDocument.m_arrPages[i].Draw(context, drawPage.left, drawPage.top, drawPage.right - drawPage.left, drawPage.bottom - drawPage.top);
+					this.m_oDrawingDocument.m_arrPages[i].Draw(context, drawPage.left, drawPage.top, drawPage.right - drawPage.left, drawPage.bottom - drawPage.top, this.m_oApi);
 				}
 				else
 				{
@@ -3384,7 +3392,7 @@ function CEditorPage(api)
 					var __y = (drawPage.top * AscCommon.AscBrowser.retinaPixelRatio) >> 0;
 					var __w = ((drawPage.right * AscCommon.AscBrowser.retinaPixelRatio) >> 0) - __x;
 					var __h = ((drawPage.bottom * AscCommon.AscBrowser.retinaPixelRatio) >> 0) - __y;
-					this.m_oDrawingDocument.m_arrPages[i].Draw(context, __x, __y, __w, __h);
+					this.m_oDrawingDocument.m_arrPages[i].Draw(context, __x, __y, __w, __h, this.m_oApi);
 				}
 			}
 		}
@@ -3421,7 +3429,7 @@ function CEditorPage(api)
 					this.m_oDrawingDocument.StartRenderingPage(i);
 				}
 
-				this.m_oDrawingDocument.m_arrPages[i].Draw(context, __x, __y, __w, __h);
+				this.m_oDrawingDocument.m_arrPages[i].Draw(context, __x, __y, __w, __h, this.m_oApi);
 				//this.m_oBoundsController.CheckRect(__x, __y, __w, __h);
 			}
 		}

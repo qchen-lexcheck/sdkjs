@@ -578,10 +578,8 @@ COverlay.prototype =
     {
         this.m_oContext.strokeStyle = "#AAAAAA";
         var nW = 2;
-        if(AscCommon.AscBrowser.isRetina)
-        {
-            nW = AscCommon.AscBrowser.convertToRetinaValue(nW, true);
-        }
+
+        nW = AscCommon.AscBrowser.convertToRetinaValue(nW, true);
         this.CheckPoint1(left, y - nW);
         this.CheckPoint2(right, y + nW);
         this.m_oContext.lineWidth = nW;
@@ -594,10 +592,8 @@ COverlay.prototype =
     {
         this.m_oContext.strokeStyle = "#AAAAAA";
         var nW = 2;
-        if(AscCommon.AscBrowser.isRetina)
-        {
-            nW = AscCommon.AscBrowser.convertToRetinaValue(nW, true);
-        }
+
+        nW = AscCommon.AscBrowser.convertToRetinaValue(nW, true);
         this.CheckPoint1(x - nW, top);
         this.CheckPoint2(x + nW, bottom);
         this.m_oContext.lineWidth = nW;
@@ -3048,8 +3044,8 @@ CAutoshapeTrack.prototype =
 
     drawFlowAnchor : function(x, y)
     {
-        var _flow_anchor = AscCommon.AscBrowser.isCustomScalingAbove2() ? AscCommon.g_flow_anchor2 : AscCommon.g_flow_anchor;
-        if (!_flow_anchor || !_flow_anchor.asc_complete || (!editor || !editor.ShowParaMarks))
+        var _flow_anchor = (AscCommon.OverlayRasterIcons && AscCommon.OverlayRasterIcons.Anchor) ? AscCommon.OverlayRasterIcons.Anchor.get() : undefined;
+        if (!_flow_anchor || (!editor || !editor.ShowParaMarks))
             return;
 
         var overlay = this.m_oOverlay;
@@ -3079,7 +3075,14 @@ CAutoshapeTrack.prototype =
 
         overlay.SetBaseTransform();
 
-        ctx.drawImage(_flow_anchor, __x, __y, Math.round(13 * rPR), Math.round(15 * rPR));
+        var _w = Math.round(13 * rPR);
+        var _h = Math.round(15 * rPR);
+        if (Math.abs(_w - _flow_anchor.width) < 2)
+            _w = _flow_anchor.width;
+        if (Math.abs(_h - _flow_anchor.height) < 2)
+            _h = _flow_anchor.height;
+
+        ctx.drawImage(_flow_anchor, __x, __y, _w, _h);
         ctx.globalAlpha = _oldAlpha;
     },
 
@@ -3123,24 +3126,7 @@ CAutoshapeTrack.prototype =
         this.m_oContext.drawImage(AscCommon.g_comment_image, _offset[0], _offset[1], _offset[2], _offset[3], __x, __y, rPR * _offset[2], rPR * _offset[3]);
 
         ctx.globalAlpha = _oldAlpha;
-    },
-
-    DrawFrozenPaneBorderHor: function(y, left, right)
-    {
-        this.m_oOverlay.SetBaseTransform();
-        autoShapeTrack.p_color(0xAA, 0xAA, 0xAA);
-        var nW = BORDER_WIDTH;
-        if(AscCommon.AscBrowser.isRetina) {
-            nW = AscCommon.AscBrowser.convertToRetinaValue(nW, true);
-        }
-        autoShapeTrack.Graphics.SetIntegerGrid(true);
-        autoShapeTrack.p_width(nW);
-        autoShapeTrack._s();
-        autoShapeTrack._m(left, y);
-        autoShapeTrack._l(right, y);
-        autoShapeTrack.ds();
-        autoShapeTrack.Graphics.SetIntegerGrid(false);
-    } 
+    }
 };
 
 	function DrawTextByCenter() // this!

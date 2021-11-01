@@ -1076,6 +1076,14 @@ function CEditorPage(api)
             AscCommon.addMouseEvent(this.m_oBody.HtmlElement, "up", this.onBodyMouseUp);
 		}
 
+		// в мобильной версии - при транзишне - не обновляется позиция/размер
+		if (this.m_oApi.isMobileVersion)
+		{
+			var _t = this;
+			document.addEventListener && document.addEventListener("transitionend", function() { _t.OnResize(false);  }, false);
+			document.addEventListener && document.addEventListener("transitioncancel", function() { _t.OnResize(false); }, false);
+		}
+
 		this.initEvents2MobileAdvances();
 
 		this.Thumbnails.initEvents();
@@ -4260,7 +4268,7 @@ function CEditorPage(api)
 			//return;
 		}
 
-		if (this.DemonstrationManager.Mode && !isReporterUpdateSlide)
+		if (this.DemonstrationManager.Mode && !isReporterUpdateSlide && !isFromZoom)
 		{
             return this.m_oApi.DemonstrationGoToSlide(lPageNum);
 		}

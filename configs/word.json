@@ -40,6 +40,9 @@
 			"common/libfont/manager.js",
 			"common/libfont/classification.js",
 
+			"common/stringserialize.js",
+			"common/random.js",
+
 			"common/Drawings/Metafile.js",
 			"common/libfont/textmeasurer.js",
 			"common/Drawings/WorkEvents.js",
@@ -190,6 +193,7 @@
 			"word/Editor/EndnotesChanges.js",
 		    "word/Editor/GlossaryDocument.js",
 		    "word/Editor/GlossaryDocumentChanges.js",
+			"word/Editor/DocumentProtection.js",
 
 			"word/Drawing/Graphics.js",
 			"word/Drawing/ShapeDrawer.js",

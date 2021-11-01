@@ -571,6 +571,8 @@ CSelectedContent.prototype =
             }
         }
 
+		this.CheckDocPartNames(LogicDocument);
+
         // Ставим метки переноса в начало и конец
         if (this.Elements.length > 0 && LogicDocument && null !== LogicDocument.TrackMoveId && undefined !== LogicDocument.TrackMoveId)
 		{
@@ -846,8 +848,6 @@ CSelectedContent.prototype.GetText = function(oPr)
 	}
 	return sText;
 };
-
-
 CSelectedContent.prototype.ConvertToPresentation = function(Parent)
 {
     var Elements = this.Elements.slice(0);
@@ -861,6 +861,35 @@ CSelectedContent.prototype.ConvertToPresentation = function(Parent)
             this.Elements.push(new CSelectedElement(AscFormat.ConvertParagraphToPPTX(oElement, Parent.DrawingDocument, Parent, true, false), false))
         }
     }
+};
+CSelectedContent.prototype.CheckDocPartNames = function(oLogicDocument)
+{
+	if (!(oLogicDocument instanceof CDocument))
+		return;
+
+	var arrCC = [];
+	for (var nIndex = 0, nCount = this.Elements.length; nIndex < nCount; ++nIndex)
+	{
+		this.Elements[nIndex].Element.GetAllContentControls(arrCC);
+	}
+
+	var oGlossaryDocument = oLogicDocument.GetGlossaryDocument();
+	for (var nIndex = 0, nCount = arrCC.length; nIndex < nCount; ++nIndex)
+	{
+		var oCC = arrCC[nIndex];
+
+		var sPlaceHolderName = oCC.GetPlaceholder();
+		if (sPlaceHolderName)
+		{
+			var oDocPart = oGlossaryDocument.GetDocPartByName(sPlaceHolderName);
+			if (!oDocPart || oGlossaryDocument.IsDefaultDocPart(oDocPart))
+				continue;
+
+			var sNewName = oGlossaryDocument.GetNewName();
+			oDocPart.SetDocPartName(sNewName);
+			oCC.SetPlaceholder(sNewName);
+		}
+	}
 };
 
 
@@ -876,6 +905,9 @@ function CDocumentRecalculateState()
     this.StartIndex   = 0;
     this.StartPage    = 0;
 	this.Endnotes     = false;
+
+	this.TimerStartTime = 0;
+	this.TimerStartPage = 0;
 
 	this.StartPagesCount   = 2;     // количество страниц, которые мы обсчитываем в первый раз без таймеров
     this.ResetStartElement = false;
@@ -895,6 +927,7 @@ function CDocumentRecalculateHdrFtrPageCountState()
 function Document_Recalculate_Page()
 {
     var LogicDocument = editor.WordControl.m_oLogicDocument;
+	LogicDocument.FullRecalc.TimerStartTime = performance.now();
     LogicDocument.Recalculate_Page();
 }
 
@@ -2552,8 +2585,14 @@ function CDocument(DrawingDocument, isMainLogicDocument)
     	AutomaticBulletedLists : true,
 		AutomaticNumberedLists : true,
 		FrenchPunctuation      : true,
-		FirstLetterOfSentences : true
+		FirstLetterOfSentences : true,
+		FirstLetterOfCells     : true,
+		Hyperlinks             : true,
+		FirstLetterExceptions  : {},
+		FirstLetterExcMaxLen   : 0,
 	};
+
+    this.private_InitDefaultFirstLetterAutoCorrectExceptions();
 
     // Контролируем изменения интерфейса
     this.ChangedStyles      = []; // Объект с Id стилями, которые были изменены/удалены/добавлены
@@ -2594,8 +2633,6 @@ function CDocument(DrawingDocument, isMainLogicDocument)
 	this.Endnotes                = new CEndnotesController(this);
 
 	this.Controller = this.LogicDocumentController;
-
-    this.StartTime = 0;
 
     // Кэш для некоторых запросов, которые могут за раз делаться несколько раз
     this.AllParagraphsList = null;
@@ -2649,7 +2686,7 @@ CDocument.prototype.On_EndLoad                     = function()
 
     // Перемещаем курсор в начало документа
 	this.SetDocPosType(docpostype_Content);
-    this.MoveCursorToStartPos(false);
+	this.MoveCursorToStartOfDocument();
 
     if (editor.DocInfo)
     {
@@ -3492,8 +3529,6 @@ CDocument.prototype.private_Recalculate = function(_RecalcData, isForceStrictRec
 
 	this.DocumentOutline.Update();
 
-    this.StartTime = new Date().getTime();
-
     if (true !== this.Is_OnRecalculate())
         return document_recalcresult_NoRecal;
 
@@ -3773,8 +3808,12 @@ CDocument.prototype.private_Recalculate = function(_RecalcData, isForceStrictRec
     this.FullRecalc.ResetStartElement = this.private_RecalculateIsNewSection(StartPage, StartIndex);
     this.FullRecalc.Endnotes          = this.Endnotes.IsContinueRecalculateFromPrevPage(StartPage);
     this.FullRecalc.StartPagesCount   = undefined !== nNoTimerPageIndex ? Math.min(100, Math.max(nNoTimerPageIndex - StartPage, 2)) : 2;
+	this.FullRecalc.StartTime         = performance.now();
+	this.FullRecalc.TimerStartTime    = this.FullRecalc.StartTime;
+	this.FullRecalc.TimerStartPage    = StartPage;
 
-    // Если у нас произошли какие-либо изменения с основной частью документа, тогда начинаем его пересчитывать сразу,
+
+	// Если у нас произошли какие-либо изменения с основной частью документа, тогда начинаем его пересчитывать сразу,
     // а если изменения касались только секций, тогда пересчитываем основную часть документа только с того места, где
     // остановился предыдущий пересчет, либо с того места, где изменения секций приводят к пересчету документа.
     if (true === MainChange)
@@ -4008,6 +4047,8 @@ CDocument.prototype.Recalculate_Page = function()
     var bStart       = this.FullRecalc.Start;        // флаг, который говорит о том, рассчитываем мы эту страницу первый раз или нет (за один общий пересчет)
     var StartIndex   = this.FullRecalc.StartIndex;
 
+    //var nStartTime = (new Date()).getTime();
+
     if (0 === SectionIndex && 0 === ColumnIndex && true === bStart)
     {
         var OldPage = ( undefined !== this.Pages[PageIndex] ? this.Pages[PageIndex] : null );
@@ -4088,14 +4129,15 @@ CDocument.prototype.Recalculate_Page = function()
 				{
 					if (window["NATIVE_EDITOR_ENJINE_SYNC_RECALC"] === true)
 					{
-						if (PageIndex + 1 > this.FullRecalc.StartPage + 2)
+						if (this.private_IsStartTimeoutOnRecalc(PageIndex))
 						{
 							if (window["native"]["WC_CheckSuspendRecalculate"] !== undefined)
 							{
 								//if (window["native"]["WC_CheckSuspendRecalculate"]())
 								//    return;
 
-								this.FullRecalc.Id = setTimeout(Document_Recalculate_Page, 10);
+								this.FullRecalc.Id             = setTimeout(Document_Recalculate_Page, 10);
+								this.FullRecalc.TimerStartPage = PageIndex + 1;
 								return;
 							}
 						}
@@ -4104,9 +4146,13 @@ CDocument.prototype.Recalculate_Page = function()
 						return;
 					}
 
-					if (PageIndex + 1 > this.FullRecalc.StartPage + 2)
+
+					if (this.private_IsStartTimeoutOnRecalc(PageIndex))
 					{
-						this.FullRecalc.Id = setTimeout(Document_Recalculate_Page, 20);
+						// console.log("Page " + _PageIndex);
+						// console.log("Pages delta " + (PageIndex + 1 - this.FullRecalc.TimerStartPage));
+						this.FullRecalc.Id             = setTimeout(Document_Recalculate_Page, 20);
+						this.FullRecalc.TimerStartPage = PageIndex + 1;
 					}
 					else
 					{
@@ -4157,6 +4203,8 @@ CDocument.prototype.Recalculate_Page = function()
 	}
 
     this.Recalculate_PageColumn();
+
+	//console.log("PageIndex " + PageIndex + " " + ((new Date()).getTime() - nStartTime)/ 1000);
 };
 /**
  * Пересчитываем следующую колоноку.
@@ -4213,10 +4261,27 @@ CDocument.prototype.Recalculate_PageColumn                   = function()
     var Count = this.Content.length;
     var Index;
 
-    var isEndEndnoteRecalc = false;
+	var nEndIndex = Count;
+
+	var isEndEndnoteRecalc = false;
 	if (this.FullRecalc.Endnotes)
 	{
-		var nEndnoteRecalcResult = this.Endnotes.Recalculate(X, Y, XLimit, YLimit - this.Footnotes.GetHeight(PageIndex, ColumnIndex), PageIndex, ColumnIndex, ColumnsCount, SectPr, this.SectionsInfo.Find(SectPr), StartIndex >= Count);
+		var nEndnoteSectionIndex = 0;
+		var oEndnoteSectPr       = null;
+
+		if (PageIndex <= 0)
+		{
+			// Такого не должно быть
+			nEndnoteSectionIndex = this.SectionsInfo.Find(SectPr);
+			oEndnoteSectPr       = SectPr;
+		}
+		else
+		{
+			nEndnoteSectionIndex = this.Endnotes.GetLastSectionIndexOnPage(PageIndex - 1);
+			oEndnoteSectPr       = this.SectionsInfo.Get(nEndnoteSectionIndex).SectPr;
+		}
+
+		var nEndnoteRecalcResult = this.Endnotes.Recalculate(X, Y, XLimit, YLimit - this.Footnotes.GetHeight(PageIndex, ColumnIndex), PageIndex, ColumnIndex, ColumnsCount, oEndnoteSectPr, nEndnoteSectionIndex, StartIndex >= Count);
 		if (recalcresult2_End === nEndnoteRecalcResult)
 		{
 			PageColumn.EndPos = -1;
@@ -4264,11 +4329,11 @@ CDocument.prototype.Recalculate_PageColumn                   = function()
 				_bEndnotesContinue  = true;
 			}
 
-			StartIndex = Count; // Выставляем так, чтобы ничего не пересчитывать из основной части документа
+			nEndIndex = StartIndex; // Выставляем так, чтобы ничего не пересчитывать из основной части документа
 		}
 	}
 
-    for (Index = StartIndex; Index < Count; ++Index)
+    for (Index = StartIndex; Index < nEndIndex; ++Index)
     {
         // Пересчитываем элемент документа
         var Element = this.Content[Index];
@@ -4278,7 +4343,8 @@ CDocument.prototype.Recalculate_PageColumn                   = function()
 
         if (!isEndEndnoteRecalc)
 		{
-			if (!Element.IsInline() || (!Element.IsParagraph() && Element.GetFramePr()))
+			var oFramePr = null;
+			if (!Element.IsInline() || (!Element.IsParagraph() && (oFramePr = Element.GetFramePr()) && !oFramePr.IsInline()))
 			{
 				bFlow = true;
 
@@ -4760,8 +4826,6 @@ CDocument.prototype.Recalculate_PageColumn                   = function()
         Page.EndPos        = Count - 1;
         PageSection.EndPos = Count - 1;
         PageColumn.EndPos  = Count - 1;
-
-        //console.log("LastRecalc: " + ((new Date().getTime() - this.StartTime) / 1000));
     }
 
     if (Index >= Count || _PageIndex > PageIndex || _ColumnIndex > ColumnIndex)
@@ -4789,6 +4853,8 @@ CDocument.prototype.Recalculate_PageColumn                   = function()
 		}
 		else
 		{
+			//console.log("Recalc time : " + ((performance.now() - this.FullRecalc.StartTime) / 1000));
+
 			this.FullRecalc.Id           = null;
 			this.FullRecalc.MainStartPos = -1;
 
@@ -4843,25 +4909,29 @@ CDocument.prototype.Recalculate_PageColumn                   = function()
 		{
             if (window["NATIVE_EDITOR_ENJINE_SYNC_RECALC"] === true)
             {
-                if (PageIndex > this.FullRecalc.StartPage + this.FullRecalc.StartPagesCount)
+				if (this.private_IsStartTimeoutOnRecalc(_PageIndex))
                 {
                     if (window["native"]["WC_CheckSuspendRecalculate"] !== undefined)
-                    {
-                        //if (window["native"]["WC_CheckSuspendRecalculate"]())
-                        //    return;
+					{
+						//if (window["native"]["WC_CheckSuspendRecalculate"]())
+						//    return;
 
-                        this.FullRecalc.Id = setTimeout(Document_Recalculate_Page, 10);
-                        return;
-                    }
+						this.FullRecalc.Id             = setTimeout(Document_Recalculate_Page, 10);
+						this.FullRecalc.TimerStartPage = _PageIndex;
+						return;
+					}
                 }
 
                 this.Recalculate_Page();
                 return;
             }
 
-			if (_PageIndex > this.FullRecalc.StartPage + this.FullRecalc.StartPagesCount)
+			if (this.private_IsStartTimeoutOnRecalc(_PageIndex))
 			{
-				this.FullRecalc.Id = setTimeout(Document_Recalculate_Page, 20);
+				// console.log("Page " + _PageIndex);
+				// console.log("Pages delta " + (_PageIndex - this.FullRecalc.TimerStartPage));
+				this.FullRecalc.Id             = setTimeout(Document_Recalculate_Page, 20);
+				this.FullRecalc.TimerStartPage = _PageIndex;
 			}
 			else
 			{
@@ -4873,6 +4943,22 @@ CDocument.prototype.Recalculate_PageColumn                   = function()
 			this.FullRecalc.Continue = true;
 		}
     }
+};
+CDocument.prototype.private_IsStartTimeoutOnRecalc = function(nPageAbs)
+{
+	// // // Старый вариант
+	// return (nPageAbs > this.FullRecalc.StartPage + this.FullRecalc.StartPagesCount);
+
+	return ((nPageAbs > this.FullRecalc.StartPage + this.FullRecalc.StartPagesCount
+		&& (performance.now() - this.FullRecalc.TimerStartTime > 10
+			|| nPageAbs > this.FullRecalc.TimerStartPage + 50)));
+
+	// if (nRes)
+	// {
+	// 	console.log("Page        " + nPageAbs);
+	// 	console.log("Pages Delta " + (nPageAbs - this.FullRecalc.TimerStartPage));
+	// }
+	//return nRes;
 };
 CDocument.prototype.private_RecalculateIsNewSection = function(nPageAbs, nContentIndex)
 {
@@ -5062,10 +5148,10 @@ CDocument.prototype.private_RecalculateFlowParagraph         = function(RecalcIn
 
 		var FrameHRule = (undefined === FramePr.HRule ? (undefined !== Frame_YLimit ? Asc.linerule_AtLeast : Asc.linerule_Auto) : FramePr.HRule);
 
-        if (undefined === Frame_XLimit)
+        if (undefined === Frame_XLimit || 0 === AscCommon.MMToTwips(Frame_XLimit))
             Frame_XLimit = Page_Field_R - Page_Field_L;
 
-        if (undefined === Frame_YLimit || Asc.linerule_Auto === FrameHRule)
+        if (undefined === Frame_YLimit || 0 === AscCommon.MMToTwips(Frame_YLimit) || Asc.linerule_Auto === FrameHRule)
             Frame_YLimit = Page_H;
 
         for (var TempIndex = Index; TempIndex < Index + FlowCount; ++TempIndex)
@@ -5111,7 +5197,7 @@ CDocument.prototype.private_RecalculateFlowParagraph         = function(RecalcIn
 				nMaxGridWidthRightGap = oTempTableInfo.GridWidth + oTempTableInfo.GapRight;
 		}
 
-        if (Element.IsParagraph() && -1 === FrameW && 1 === FlowCount && 1 === Element.Lines.length && undefined === FramePr.Get_W())
+        if (Element.IsParagraph() && -1 === FrameW && 1 === FlowCount && 1 === Element.Lines.length && (undefined === FramePr.Get_W() || 0 === AscCommon.MMToTwips(FramePr.Get_W())))
         {
 			FrameW     = Element.GetAutoWidthForDropCap();
 			var ParaPr = Element.Get_CompiledPr2(false).ParaPr;
@@ -5128,7 +5214,7 @@ CDocument.prototype.private_RecalculateFlowParagraph         = function(RecalcIn
         }
         else if (-1 === FrameW)
         {
-			if (Element.IsTable() && !FramePr.Get_W())
+			if (Element.IsTable() && (!FramePr.Get_W() || 0 === AscCommon.MMToTwips(FramePr.Get_W())))
 			{
 				FrameW = nMaxGridWidth;
 			}
@@ -5141,7 +5227,7 @@ CDocument.prototype.private_RecalculateFlowParagraph         = function(RecalcIn
 		var nGapLeft  = nMaxGapLeft;
 		var nGapRight = nMaxGridWidthRightGap > FrameW && nMaxGridWidth < FrameW + 0.001 ? nMaxGridWidthRightGap - FrameW : 0;
 
-		if ((Asc.linerule_AtLeast === FrameHRule && FrameH < FramePr.H) || Asc.linerule_Exact === FrameHRule)
+		if (0 !== AscCommon.MMToTwips(FramePr.H) && ((Asc.linerule_AtLeast === FrameHRule && FrameH < FramePr.H) || Asc.linerule_Exact === FrameHRule))
         {
             FrameH = FramePr.H;
         }
@@ -5155,10 +5241,10 @@ CDocument.prototype.private_RecalculateFlowParagraph         = function(RecalcIn
 
         // Рассчитаем положение по горизонтали
         var FrameX = 0;
-        if (undefined != FramePr.XAlign || undefined === FramePr.X)
+        if (undefined !== FramePr.XAlign || undefined === FramePr.X)
         {
             var XAlign = c_oAscXAlign.Left;
-            if (undefined != FramePr.XAlign)
+            if (undefined !== FramePr.XAlign)
                 XAlign = FramePr.XAlign;
 
             switch (FrameHAnchor)
@@ -5224,7 +5310,7 @@ CDocument.prototype.private_RecalculateFlowParagraph         = function(RecalcIn
 
         // Рассчитаем положение по вертикали
         var FrameY = 0;
-        if (undefined != FramePr.YAlign)
+        if (undefined !== FramePr.YAlign)
         {
             var YAlign = FramePr.YAlign;
             // Случай c_oAscYAlign.Inline не обрабатывается, потому что такие параграфы считаются Inline
@@ -5279,20 +5365,26 @@ CDocument.prototype.private_RecalculateFlowParagraph         = function(RecalcIn
         else
         {
             var FramePrY = 0;
-            if (undefined != FramePr.Y)
+            if (undefined !== FramePr.Y)
                 FramePrY = FramePr.Y;
 
             switch (FrameVAnchor)
             {
-                case c_oAscVAnchor.Page   :
-                    FrameY = FramePrY;
-                    break;
-                case c_oAscVAnchor.Text   :
-                    FrameY = FramePrY + Y;
-                    break;
-                case c_oAscVAnchor.Margin :
-                    FrameY = FramePrY + Page_Field_T;
-                    break;
+				case c_oAscVAnchor.Page   :
+					FrameY = FramePrY;
+					break;
+				case c_oAscVAnchor.Text   :
+					FrameY = FramePrY + Y;
+					break;
+				case c_oAscVAnchor.Margin :
+
+					// Если Y не задано, либо ровно 0, тогда MSWord считает это как привязка к тексту (баг 52903)
+					if (undefined === FramePr.Y || 0 === AscCommon.MMToTwips(FramePr.Y))
+						FrameY = Y + 0.001; // Погрешность, чтобы не сдвигалась предыдущая строка из-за обтекания
+					else
+						FrameY = FramePrY + Page_Field_T;
+
+					break;
             }
         }
 
@@ -6564,6 +6656,8 @@ CDocument.prototype.MoveCursorToStartOfDocument = function()
 	this.RemoveSelection();
 	this.SetDocPosType(docpostype_Content);
 	this.MoveCursorToStartPos(false);
+
+	this.private_CheckCursorPosInFillingFormMode();
 };
 CDocument.prototype.MoveCursorToStartPos = function(AddToSelect)
 {
@@ -11110,7 +11204,7 @@ CDocument.prototype.OnMouseUp = function(e, X, Y, PageIndex)
 		}
 	}
 
-	this.private_CheckCursorPosInFillingFormMode(12);
+	this.private_CheckCursorPosInFillingFormMode();
 
 	this.private_UpdateCursorXY(true, true);
 };
@@ -12143,7 +12237,7 @@ CDocument.prototype.private_UpdateInterface = function(bSaveCurRevisionChange)
 	// Удаляем весь список
 	this.Api.sync_BeginCatchSelectedElements();
 
-	this.TrackRevisionsManager.BeginCollectChanges(bSaveCurRevisionChange && !this.IsSimpleMarkupInReview());
+	this.TrackRevisionsManager.BeginCollectChanges(bSaveCurRevisionChange);
 
 	// Уберем из интерфейса записи о том где мы находимся (параграф, таблица, картинка или колонтитул)
 	this.Api.ClearPropObjCallback();
@@ -15482,7 +15576,7 @@ CDocument.prototype.Update_ForeignCursor = function(CursorInfo, UserId, Show, Us
 	}
 
 	var Changes = new AscCommon.CCollaborativeChanges();
-	var Reader  = Changes.GetStream(CursorInfo, 0, CursorInfo.length);
+	var Reader  = Changes.GetStream(CursorInfo);
 
 	var RunId    = Reader.GetString2();
 	var InRunPos = Reader.GetLong();
@@ -16857,12 +16951,10 @@ CDocument.prototype.GetLocalTrackRevisions = function()
  */
 CDocument.prototype.SetGlobalTrackRevisions = function(isTrack, isUpdateInterface)
 {
-	if (isTrack !== this.Settings.TrackRevisions && !this.IsSelectionLocked(AscCommon.changestype_Document_Settings))
+	if (isTrack !== this.Settings.TrackRevisions)
 	{
-		this.StartAction(AscDFH.historydescription_Document_SetTrackRevisions);
 		this.History.Add(new CChangesDocumentSettingsTrackRevisions(this, this.Settings.TrackRevisions, isTrack, this.GetUserId()));
 		this.Settings.TrackRevisions = isTrack;
-		this.FinalizeAction();
 	}
 
 	if (true === isUpdateInterface)
@@ -18347,6 +18439,8 @@ CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAd
 	//    выполнить автозамены
 	if (type_Paragraph === Item.GetType())
 	{
+		var isCheckAutoCorrect = false;
+
 		// Если текущий параграф пустой и с нумерацией, тогда удаляем нумерацию и отступы левый и первой строки
 		if (true !== bForceAdd && undefined != Item.GetNumPr() && true === Item.IsEmpty({SkipNewLine : true}) && true === Item.IsCursorAtBegin())
 		{
@@ -18376,11 +18470,7 @@ CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAd
 				if (true === Item.IsCursorAtEnd())
 				{
 					if (!Item.Lock.Is_Locked())
-					{
-						var oParaEndRun = Item.GetParaEndRun();
-						if (oParaEndRun)
-							oParaEndRun.ProcessAutoCorrectOnParaEnd();
-					}
+						isCheckAutoCorrect = true;
 
 					var StyleId = Item.Style_Get();
 					var NextId  = undefined;
@@ -18448,6 +18538,17 @@ CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAd
 				Item.SetReviewType(reviewtype_Common);
 			}
             NewParagraph.CheckSignatureLinesOnAdd();
+		}
+
+		if (isCheckAutoCorrect)
+		{
+			var nContentPos = this.CurPos.ContentPos;
+
+			var oParaEndRun = Item.GetParaEndRun();
+			if (oParaEndRun)
+				oParaEndRun.ProcessAutoCorrectOnParaEnd();
+
+			this.CurPos.ContentPos = nContentPos;
 		}
 	}
 	else if (type_Table === Item.GetType() || type_BlockLevelSdt === Item.GetType())
@@ -21612,6 +21713,42 @@ CDocument.prototype.MoveToFillingForm = function(isNext)
 		{
 			this.DrawingObjects.resetSelection();
 			oParaDrawing.GoTo_Text(true !== isNext, false);
+
+			// В случаях, когда у нас автофигура внутри другой автофигуры
+			var arrPassedParagraphs = [];
+			var oParagraph = this.GetCurrentParagraph();
+			var oShape     = oParagraph.GetParent() ? oParagraph.GetParent().Is_DrawingShape(true) : null;
+
+			while (oShape)
+			{
+				oParaDrawing = oShape.parent;
+				var isBreak = false;
+				for (var nIndex = 0, nCount = arrPassedParagraphs.length; nIndex < nCount; ++nIndex)
+				{
+					if (arrPassedParagraphs[nIndex] === oParagraph)
+					{
+						isBreak = true;
+						break;
+					}
+				}
+
+				if (isBreak)
+					break;
+
+				arrPassedParagraphs.push(oParagraph);
+				oRes = oParaDrawing.FindNextFillingForm(isNext, true);
+				if (oRes)
+				{
+					break;
+				}
+				else
+				{
+					oParaDrawing.GoTo_Text(true !== isNext, false);
+					oParagraph = this.GetCurrentParagraph();
+					oShape     = oParagraph.GetParent() ? oParagraph.GetParent().Is_DrawingShape(true) : null;
+				}
+
+			}
 		}
 	}
 
@@ -23489,7 +23626,7 @@ CDocument.prototype.IsAutoCorrectFrenchPunctuation = function()
 	return this.AutoCorrectSettings.FrenchPunctuation;
 };
 /**
- * Выставляем настройку атозамены для первового символа предложения
+ * Выставляем настройку атозамены для первого символа предложения
  * @param {boolean} isCorrect
  */
 CDocument.prototype.SetAutoCorrectFirstLetterOfSentences = function(isCorrect)
@@ -23497,12 +23634,175 @@ CDocument.prototype.SetAutoCorrectFirstLetterOfSentences = function(isCorrect)
 	this.AutoCorrectSettings.FirstLetterOfSentences = isCorrect;
 };
 /**
- * Запрашиваем настройку атозамены для первового символа предложения
+ * Запрашиваем настройку атозамены для первого символа предложения
  * @return {boolean}
  */
 CDocument.prototype.IsAutoCorrectFirstLetterOfSentences = function()
 {
 	return this.AutoCorrectSettings.FirstLetterOfSentences;
+};
+/**
+ * Выставляем настройку атозамены для первого символа в ячейке таблицы
+ * @param {boolean} isCorrect
+ */
+CDocument.prototype.SetAutoCorrectFirstLetterOfCells = function(isCorrect)
+{
+	this.AutoCorrectSettings.FirstLetterOfCells = isCorrect;
+}
+/**
+ * Запрашиваем настройку атозамены для первого символа ячейки таблицы
+ * @return {boolean}
+ */
+CDocument.prototype.IsAutoCorrectFirstLetterOfCells = function()
+{
+	return this.AutoCorrectSettings.FirstLetterOfCells;
+};
+/**
+ * Выставляем настройку атозамены для гиперссылок
+ * @param {boolean} isCorrect
+ */
+CDocument.prototype.SetAutoCorrectHyperlinks = function(isCorrect)
+{
+	this.AutoCorrectSettings.Hyperlinks = isCorrect;
+};
+/**
+ * Запрашиваем настройку атозамены для гиперссылок
+ * @return {boolean}
+ */
+CDocument.prototype.IsAutoCorrectHyperlinks = function()
+{
+	return this.AutoCorrectSettings.Hyperlinks;
+};
+/**
+ * Получаем массив исключений для автозамены первой буквы предложения
+ * @returns {Array.string}
+ */
+CDocument.prototype.GetFirstLetterAutoCorrectExceptions = function()
+{
+	var arrResult = [];
+	for (var nChar in this.AutoCorrectSettings.FirstLetterExceptions)
+	{
+		arrResult = arrResult.concat(this.AutoCorrectSettings.FirstLetterExceptions[nChar]);
+	}
+
+	return arrResult;
+};
+/**
+ * Задаем массив исключений для автозамены первой буквы предложения
+ * @returns {Array.string}
+ */
+CDocument.prototype.SetFirstLetterAutoCorrectExceptions = function(arrExceptions)
+{
+	this.AutoCorrectSettings.FirstLetterExceptions = {};
+
+	var nMaxLen = 0;
+	for (var nIndex = 0, nCount = arrExceptions.length; nIndex < nCount; ++nIndex)
+	{
+		if (!arrExceptions[nIndex].length)
+			continue;
+
+		if (arrExceptions[nIndex].length > nMaxLen)
+			nMaxLen = arrExceptions[nIndex].length;
+
+		var nChar = arrExceptions[nIndex].charAt(0);
+
+		if (!this.AutoCorrectSettings.FirstLetterExceptions[nChar])
+			this.AutoCorrectSettings.FirstLetterExceptions[nChar] = [];
+
+		this.AutoCorrectSettings.FirstLetterExceptions[nChar].push(arrExceptions[nIndex]);
+	}
+
+	this.AutoCorrectSettings.FirstLetterExcMaxLen = nMaxLen;
+};
+/**
+ * Проверяем слово, попадает ли оно в список исключений
+ * @param sWord
+ * @returns {boolean}
+ */
+CDocument.prototype.CheckFirstLetterAutoCorrectException = function(sWord)
+{
+	var _sWord = sWord.toLowerCase();
+
+	var nChar = _sWord.charAt(0);
+	if (!this.AutoCorrectSettings.FirstLetterExceptions[nChar])
+		return false;
+
+	var arrExceptions = this.AutoCorrectSettings.FirstLetterExceptions[nChar];
+	for (var nIndex = 0, nCount = arrExceptions.length; nIndex < nCount; ++nIndex)
+	{
+		if (_sWord === arrExceptions[nIndex])
+			return true;
+	}
+
+	return false;
+};
+CDocument.prototype.GetFirstLetterAutoCorrectExceptionsMaxLen = function()
+{
+	return this.AutoCorrectSettings.FirstLetterExcMaxLen;
+};
+CDocument.prototype.private_InitDefaultFirstLetterAutoCorrectExceptions = function()
+{
+	// Init default for Latin and Cyrillic
+	this.SetFirstLetterAutoCorrectExceptions([
+		"a", "abbr", "abs", "acct", "addn", "adj", "advt", "al", "alt", "amt", "anon", "approx", "appt", "apr", "apt", "assn", "assoc", "asst", "attn", "attrib", "aug", "aux", "ave", "avg",
+		"b", "bal", "bldg", "blvd", "bot", "bro", "bros",
+		"c", "ca", "calc", "cc", "cert", "certif", "cf", "cit", "cm", "co", "comp", "conf", "confed", "const", "cont", "contrib", "coop", "corp", "ct",
+		"d", "dbl", "dec", "decl", "def", "defn", "dept", "deriv", "diag", "diff", "div", "dm", "dr", "dup", "dupl",
+		"e", "encl", "eq", "eqn", "equip", "equiv", "esp", "esq", "est", "etc", "excl", "ext",
+		"f", "feb", "ff", "fig", "freq", "fri", "ft", "fwd",
+		"g", "gal", "gen", "gov", "govt",
+		"h", "hdqrs", "hgt", "hist", "hosp", "hq", "hr", "hrs", "ht", "hwy",
+		"i", "ib", "ibid", "illus", "in", "inc", "incl", "incr", "int", "intl", "irreg", "ital",
+		"j", "jan", "jct", "jr", "jul", "jun",
+		"k", "kg", "km", "kmh",
+		"l", "lang", "lb", "lbs", "lg", "lit", "ln", "lt",
+		"m", "mar", "masc", "max", "mfg", "mg", "mgmt", "mgr", "mgt", "mhz", "mi", "min", "misc", "mkt", "mktg", "ml", "mm", "mngr", "mon", "mph", "mr", "mrs", "msec", "msg", "mt", "mtg", "mtn", "mun",
+		"n", "na", "name", "nat", "natl", "ne", "neg", "ng", "no", "norm", "nos", "nov", "num", "nw",
+		"o", "obj", "occas", "oct", "op", "opt", "ord", "org", "orig", "oz",
+		"p", "pa", "pg", "pkg", "pl", "pls", "pos", "pp", "ppt", "pred", "pref", "prepd", "prev", "priv", "prof", "proj", "pseud", "psi", "pt", "publ",
+		"q", "qlty", "qt", "qty",
+		"r", "rd", "re", "rec", "ref", "reg", "rel", "rep", "req", "reqd", "resp", "rev",
+		"s", "sat", "sci", "se", "sec", "sect", "sep", "sept", "seq", "sig", "soln", "soph", "spec", "specif", "sq", "sr", "st", "sta", "stat", "std", "subj", "subst", "sun", "supvr", "sw",
+		"t", "tbs", "tbsp", "tech", "tel", "temp", "thur", "thurs", "tkt", "tot", "transf", "transl", "tsp", "tues",
+		"u", "univ", "util",
+		"v", "var", "veg", "vert", "viz", "vol", "vs",
+		"w", "wed", "wk", "wkly", "wt",
+		"x",
+		"y", "yd", "yr",
+		"z",
+
+		"а",
+		"б",
+		"вв",
+		"гг", "гл",
+		"д", "др",
+		"е", "ед",
+		"ё",
+		"ж",
+		"з",
+		"и",
+		"й",
+		"к", "кв", "кл", "коп", "куб",
+		"лл",
+		"м", "мл", "млн", "млрд",
+		"н", "наб", "нач",
+		"о", "обл", "обр", "ок",
+		"п", "пер", "пл", "пос", "пр",
+		"руб",
+		"сб", "св", "см", "соч", "ср", "ст", "стр",
+		"тт", "тыс",
+		"у",
+		"ф",
+		"х",
+		"ц",
+		"ш", "шт",
+		"щ",
+		"ъ",
+		"ы",
+		"ь",
+		"э", "экз",
+		"ю"]
+	);
 };
 /**
  * Получаем идентификатор текущего пользователя
@@ -24763,6 +25063,9 @@ CDocument.prototype.OnChangeForm = function(sKey, oForm, oPr)
 	if (!this.Action.Start || (this.Action.Additional && true === this.Action.Additional.FormChangeStart))
 		return;
 
+	if (!sKey)
+		return;
+
 	if (!this.Action.Additional.FormChange)
 		this.Action.Additional.FormChange = {};
 
@@ -25243,11 +25546,34 @@ CDocument.prototype.ChangeTextCase = function(nCaseType)
 			var oChangeEngine = new CDocumentChangeTextCaseEngine(nCaseType);
 
 			var arrParagraphs = this.GetSelectedParagraphs();
+
+			oChangeEngine.SentenceSettings = [];
+			oChangeEngine.flag = 0;
+			oChangeEngine.GlobalSettings = true;
+			oChangeEngine.CurrentParagraph = 0;
+			oChangeEngine.isAllinTable = true;
+			if (oChangeEngine.ChangeType === Asc.c_oAscChangeTextCaseType.SentenceCase || oChangeEngine.ChangeType === Asc.c_oAscChangeTextCaseType.CapitalizeWords)
+			{
+				for (var nIndex = 0, nCount = arrParagraphs.length; nIndex < nCount; ++nIndex)
+				{
+					var oParagraph1 = arrParagraphs[nIndex];
+					if (!oParagraph1.Parent.IsTableCellContent())
+					{
+						oChangeEngine.isAllinTable = false;
+					}
+					oParagraph1.CheckRunContent(function(oRun)
+					{
+						oRun.CheckTextForTextCase(oChangeEngine);
+					});
+					oChangeEngine.CurrentParagraph++;
+				}
+			}
 			for (var nIndex = 0, nCount = arrParagraphs.length; nIndex < nCount; ++nIndex)
 			{
 				oChangeEngine.Reset();
 
 				var oParagraph = arrParagraphs[nIndex];
+
 				oParagraph.CheckRunContent(function(oRun)
 				{
 					oRun.ChangeTextCase(oChangeEngine);
@@ -25307,14 +25633,13 @@ CDocument.prototype.CanDragAndDrop = function()
  */
 CDocument.prototype.ConvertTextToTable = function(oProps)
 {
-	if (!this.IsTextSelectionUse())
+	if (!this.IsTextSelectionUse() || this.IsTableCellSelection())
 		return;
 
 	if (!this.IsSelectionLocked(AscCommon.changestype_Document_Contentt))
 	{
 		this.StartAction(AscDFH.historydescription_Document_ConvertTextToTable);
 
-		var oTable = this.GetCurrentTablesStack().pop();
 		var oSelectedContent = this.GetSelectedContent(true);
 		if (!this.private_ConvertTextToTable(oProps, oSelectedContent))
 		{
@@ -25323,45 +25648,53 @@ CDocument.prototype.ConvertTextToTable = function(oProps)
 			return;
 		}
 
-		var oParagraph = this.GetCurrentParagraph();
-		var oParent = oParagraph.GetParent();
-		if (oSelectedContent && oParent)
+		this.RemoveBeforePaste();
+		var oParagraph  = this.GetCurrentParagraph();
+		var oDocContent = oParagraph ? oParagraph.GetParent() : null;
+		if (oSelectedContent
+			&& oSelectedContent.Elements.length
+			&& oDocContent
+			&& oParagraph.IsUseInDocument()
+			&& oDocContent.GetElement(oParagraph.GetIndex()) === oParagraph)
 		{
-			if (oParent === this || (oParent instanceof CDocumentContent && !oTable))
+			var nInsertPos = 0;
+			if (oParagraph.IsCursorAtBegin())
 			{
-				this.RemoveBeforePaste();
-				if (oParagraph)
-				{
-					if (oParagraph.GetIndex() < 0 || oParagraph.Parent.IsInTable())
-						oParagraph = this.GetCurrentParagraph();
+				nInsertPos = oParagraph.GetIndex();
+			}
+			else if (oParagraph.IsCursorAtEnd())
+			{
+				nInsertPos = oParagraph.GetIndex() + 1;
+				oParagraph = null;
+			}
+			else
+			{
+				var oNewParagraph = oParagraph.Split();
 
-					var oAnchorPos = oParagraph.GetCurrentAnchorPosition();
-					if (oAnchorPos && this.Can_InsertContent(oSelectedContent, oAnchorPos))
-					{
-						oParagraph.Check_NearestPos(oAnchorPos);
-						oParagraph.Parent.InsertContent(oSelectedContent, oAnchorPos);
-						if (oParagraph.IsEmpty() && oParagraph.IsUseInDocument())
-							this.RemoveFromContent(oParagraph.GetIndex(), 1, true);
-						// this.MoveCursorRight(false, false, false);
-					}
+				nInsertPos = oParagraph.GetIndex() + 1;
+				oParagraph = null;
+
+				if (!oNewParagraph.IsEmpty())
+				{
+					oDocContent.AddToContent(nInsertPos, oNewParagraph);
 				}
 			}
-			else if (oTable) // если внутри ячейки таблицы
+
+			var nCount = oSelectedContent.Elements.length;
+			for (var nIndex = 0; nIndex < nCount; ++nIndex)
 			{
-				var oElement = oTable.CurCell.Content;
-				var start    = Math.min(oElement.Selection.StartPos, oElement.Selection.EndPos);
-				if (!oElement.Content[start].IsSelectedAll())
-					start++;
-
-				this.RemoveBeforePaste();
-
-				oElement.Internal_Content_Add(start, oSelectedContent.Elements[0].Element, false);
-				oElement.Selection.StartPos = oElement.Selection.EndPos = start;
-				oElement.SetSelectionUse(true);
-				oTable.SetSelectionUse(true);
-				this.Selection.StartPos = this.Selection.EndPos = oTable.GetIndex();
-				this.Selection.Use      = true;
+				var oElement = oSelectedContent.Elements[nIndex].Element;
+				oDocContent.AddToContent(nInsertPos + nIndex, oElement);
+				oElement.SelectAll();
 			}
+
+			if (oParagraph && oParagraph.IsEmpty())
+				oDocContent.RemoveFromContent(oParagraph.GetIndex(), 1);
+
+			oDocContent.Selection.Use      = true;
+			oDocContent.Selection.StartPos = nInsertPos;
+			oDocContent.Selection.EndPos   = nInsertPos + nCount - 1;
+			oDocContent.SetThisElementCurrent();
 		}
 
 		this.UpdateSelection();
@@ -25523,10 +25856,9 @@ CDocument.prototype.ConvertTableToText = function(oProps)
 	{
 		this.StartAction(AscDFH.historydescription_Document_ConvertTableToText);
 		var FramePr = null;
-		var ArrNewContent = this.private_ConvertTableToText(oTable, oProps);
+		var NewContent = this.private_ConvertTableToText(oTable, oProps);
 		var oNewContent = new CSelectedContent();
-		var oSkipStart = 0, oSkipEnd = 1;
-		var bEnd = false;
+		var oSkipStart = NewContent.before ? 1 : 0;
 
 		if (!oTable.IsInline())
 		{
@@ -25537,23 +25869,30 @@ CDocument.prototype.ConvertTableToText = function(oProps)
 			FramePr.Y = oTable.PositionV.Value;
 		}
 
-		for (var i = 0; i < ArrNewContent.length; i++)
+		if (NewContent.before)
+			oNewContent.Add(new CSelectedElement(NewContent.before, true));
+
+		for (var i = 0; i < NewContent.content.length; i++)
 		{
-			oNewContent.Add(new CSelectedElement(ArrNewContent[i], true));
-			if (ArrNewContent[i].IsParagraph())
+			oNewContent.Add(new CSelectedElement(NewContent.content[i], true));
+			if (FramePr)
 			{
-				bEnd = true;
-				if (FramePr)
-					ArrNewContent[i].Set_FramePr2(FramePr);
-			}
-			else
-			{
-				if (bEnd)
-					oSkipEnd++;
-				else
-					oSkipStart++;
+				if (NewContent.content[i].IsParagraph())
+				{
+					NewContent.content[i].Set_FramePr2(FramePr);
+				}
+				else if (NewContent.content[i].IsTable() || NewContent.content[i].IsBlockLevelSdt())
+				{
+					var ArrParagraphs = NewContent.content[i].GetAllParagraphs();
+					ArrParagraphs.forEach(function(item) {
+						item.Set_FramePr2(FramePr);
+					});
+				}
 			}
 		}
+
+		if (NewContent.after)
+			oNewContent.Add(new CSelectedElement(NewContent.after, true));
 		
 		var oParent = oTable.GetParent();
 		if (oNewContent && oParent)
@@ -25576,11 +25915,11 @@ CDocument.prototype.ConvertTableToText = function(oProps)
 
 				oParent.RemoveFromContent(oParagraph.GetIndex(), 1, true);
 				if (oParent.SelectRange)
-					oParent.SelectRange(nIndex + oSkipStart, nIndex + ArrNewContent.length - oSkipEnd);
+					oParent.SelectRange(nIndex + oSkipStart, nIndex + NewContent.content.length + oSkipStart - 1);
 				else if (oParent.Selection)
 				{
 					oParent.Selection.StartPos = nIndex + oSkipStart;
-					oParent.Selection.EndPos = nIndex + ArrNewContent.length - oSkipEnd;
+					oParent.Selection.EndPos = nIndex + NewContent.content.length + oSkipStart - 1;
 				}
 				// this.MoveCursorRight(false, false, false);
 			}
@@ -25607,7 +25946,7 @@ CDocument.prototype.private_ConvertTableToText = function(oTable, oProps)
 			var	oLastCell;
 			if (oSelectedRows.Start === oSelectedRows.End)
 			{
-				if (oTable.Selection.StartPos.Pos.Cell === oTable.Selection.EndPos.Pos.Cell)
+				if (oTable.Selection.StartPos.Pos.Cell === oTable.Selection.EndPos.Pos.Cell && oTable.GetRow(oSelectedRows.Start).GetCellsCount() > 1)
 				{
 					isConvertAll = true;
 				}
@@ -25635,7 +25974,7 @@ CDocument.prototype.private_ConvertTableToText = function(oTable, oProps)
 		}
 
 		var TableC = oTable.Copy();
-		var ArrNewContent = [];
+		var NewContent = {before: null, content: [], after: null};
 		if (isConvertAll)
 		{
 			oSelectedRows.Start = 0;
@@ -25646,7 +25985,7 @@ CDocument.prototype.private_ConvertTableToText = function(oTable, oProps)
 			var oRow = TableC.GetRow(i);
 			var Tabs = oProps.type == 2 ? new CParaTabs() : null;
 			var oNewParagraph = new Paragraph(this.DrawingDocument, this);
-			ArrNewContent.push(oNewParagraph);
+			NewContent.content.push(oNewParagraph);
 			var bAdd = true;
 			for (var k = 0; k < oRow.GetCellsCount(); k++)
 			{
@@ -25661,31 +26000,29 @@ CDocument.prototype.private_ConvertTableToText = function(oTable, oProps)
 							if (isNewPar)
 							{
 								oNewParagraph = new Paragraph(this.DrawingDocument, this);
-								ArrNewContent.push(oNewParagraph);
+								NewContent.content.push(oNewParagraph);
 							}
 							else
 							{
 								isNewPar = true;
 							}
 							oNewParagraph.Concat(oElement, true);
-							oNewParagraph.SetParagraphAlign(1);
+							if (oProps.type !== 1)
+								oNewParagraph.SetParagraphAlign(1);
 							break;
 						case type_Table:
-							var oNestedContent = (oProps.nested) ? this.private_ConvertTableToText(oElement, oProps) : [oElement];
-							if (j == 0 && ArrNewContent[ArrNewContent.length-1].IsEmpty() && bAdd)
-								ArrNewContent.pop();
-							
-							if (k)
-								ArrNewContent[ArrNewContent.length - 1].Concat(oNestedContent.shift(), true);
+							var oNestedContent = (oProps.nested) ? this.private_ConvertTableToText(oElement, oProps) : {content:[oElement]};
+							if (j == 0 && NewContent.content[NewContent.content.length-1].IsEmpty() && bAdd)
+								NewContent.content.pop();
 
-							ArrNewContent = ArrNewContent.concat(oNestedContent);
+							NewContent.content = NewContent.content.concat(oNestedContent.content);
 							isNewPar = true;
 							break;
 						default:
-							ArrNewContent.push(oElement);
+							NewContent.content.push(oElement);
 							isNewPar = true;
-							if (j == 0 && ArrNewContent[ArrNewContent.length-1].IsEmpty() && bAdd)
-								ArrNewContent.pop();
+							if (j == 0 && NewContent.content[NewContent.content.length-1].IsEmpty() && bAdd)
+								NewContent.content.pop();
 							break;
 					}
 					bAdd = false;
@@ -25703,7 +26040,7 @@ CDocument.prototype.private_ConvertTableToText = function(oTable, oProps)
 							break;
 						case 1:
 							oNewParagraph = new Paragraph(this.DrawingDocument, this);
-							ArrNewContent.push(oNewParagraph);
+							NewContent.content.push(oNewParagraph);
 							break;
 						default:
 							oText = new ParaText(oProps.separator);
@@ -25730,27 +26067,27 @@ CDocument.prototype.private_ConvertTableToText = function(oTable, oProps)
 			}
 			if (!oSelectedRows.IsSelectionToEnd && oSelectedRows.Start) {
 				var oNewTable = TableC.Split();
-				ArrNewContent.push(oNewTable);
-				ArrNewContent.unshift(TableC);
+				NewContent.after = oNewTable;
+				NewContent.before = TableC;
 			}
 			if (oSelectedRows.IsSelectionToEnd)
 			{
-				ArrNewContent.unshift(TableC);
+				NewContent.before = TableC;
 			}
 			else if (!oSelectedRows.Start)
 			{
-				ArrNewContent.push(TableC);
+				NewContent.after = TableC;
 			}
 		}
 
-		for (var i = 0; i < ArrNewContent.length; i++)
+		for (var i = 0; i < NewContent.content.length; i++)
 		{
-			if (ArrNewContent[i].IsParagraph())
-				ArrNewContent[i].CorrectContent();
+			if (NewContent.content[i].IsParagraph())
+				NewContent.content[i].CorrectContent();
 		}
 	
 	}
-	return ArrNewContent;
+	return NewContent;
 };
 
 function CDocumentSelectionState()
@@ -26367,6 +26704,7 @@ function CTrackRevisionsManager(oLogicDocument)
 {
 	this.LogicDocument     = oLogicDocument;
 	this.CheckElements     = {};   // Элементы, которые нужно проверить
+	this.CheckArray        = [];   // Дублирующий массив элементов, которые нужно проверить
 	this.Changes           = {};   // Объект с ключом - Id параграфа, в котором лежит массив изменений
 	this.ChangesOutline    = [];   // Упорядоченный массив с объектами, в которых есть изменения в рецензировании
 	this.CurChange         = null; // Текущее изменение
@@ -26388,12 +26726,12 @@ CTrackRevisionsManager.prototype.CheckElement = function(oElement)
 	if (!(oElement instanceof Paragraph) && !(oElement instanceof CTable))
 		return;
 
-	var sElementId = oElement.GetId();
-
-    if (!this.CheckElements[sElementId])
-        this.CheckElements[sElementId] = 1;
-    else
-        this.CheckElements[sElementId]++;
+	for (var nIndex = 0, nCount = this.CheckArray.length; nIndex < nCount; ++nIndex)
+	{
+		if (this.CheckArray[nIndex] === oElement)
+			return;
+	}
+	this.CheckArray.push(oElement);
 };
 /**
  * Добавляем изменение в рецензировании по Id элемента
@@ -26402,8 +26740,8 @@ CTrackRevisionsManager.prototype.CheckElement = function(oElement)
  */
 CTrackRevisionsManager.prototype.AddChange = function(sId, oChange)
 {
-	this.private_CheckChangeObject(sId);
-    this.Changes[sId].push(oChange);
+	if (this.private_CheckChangeObject(sId))
+    	this.Changes[sId].push(oChange);
 };
 /**
  * Получаем массив изменений заданного элемента
@@ -26419,20 +26757,28 @@ CTrackRevisionsManager.prototype.GetElementChanges = function(sElementId)
 };
 CTrackRevisionsManager.prototype.ContinueTrackRevisions = function(isComplete)
 {
-	// За раз обрабатываем не больше 50 параграфов, чтобы не подвешивать клиент на открытии файлов
-	var nMaxCounter = 50,
+	var nCount = this.CheckArray.length;
+	if (nCount <= 0)
+		return;
+
+	var nStartTime = performance.now();
+
+	// За раз обрабатываем не больше 500 параграфов либо не больше 4мс по времени,
+	// чтобы не подвешивать клиент на открытии файлов
+	var nMaxCounter = 500,
 		nCounter    = 0;
 
 	var bNeedUpdate = false;
-	for (var sId in this.CheckElements)
+
+	for (var nIndex = nCount - 1; nIndex >= 0; --nIndex)
 	{
-		if (this.private_TrackChangesForSingleElement(sId))
+		if (this.private_TrackChangesForSingleElement(nIndex))
 			bNeedUpdate = true;
 
 		if (true !== isComplete)
 		{
 			++nCounter;
-			if (nCounter >= nMaxCounter)
+			if (nCounter >= nMaxCounter || (performance.now() - nStartTime) > 4)
 				break;
 		}
 	}
@@ -26856,7 +27202,7 @@ CTrackRevisionsManager.prototype.Get_VisibleChanges = function()
 };
 CTrackRevisionsManager.prototype.BeginCollectChanges = function(bSaveCurrentChange)
 {
-    if (true === this.private_HaveParasToCheck())
+    if (!this.private_IsAllParagraphsChecked())
         return;
 
 	this.OldVisibleChanges = this.VisibleChanges;
@@ -26882,14 +27228,13 @@ CTrackRevisionsManager.prototype.BeginCollectChanges = function(bSaveCurrentChan
 };
 CTrackRevisionsManager.prototype.EndCollectChanges = function(oDocument)
 {
-	if (true === this.private_HaveParasToCheck())
+	if (!this.private_IsAllParagraphsChecked())
 		return;
 
 	var oEditor = oDocument.GetApi();
 	if (oDocument.IsSimpleMarkupInReview())
 	{
 		this.VisibleChanges = [];
-		this.CurChange      = null;
 
 		oEditor.sync_BeginCatchRevisionsChanges();
 		oEditor.sync_EndCatchRevisionsChanges();
@@ -27098,17 +27443,6 @@ CTrackRevisionsManager.prototype.Get_AllChangesRelatedParagraphsBySelectedParagr
     }
     return this.private_ConvertParagraphsObjectToArray(RelatedParas);
 };
-CTrackRevisionsManager.prototype.private_HaveParasToCheck = function()
-{
-    for (var sId in this.CheckElements)
-    {
-        var oElement = g_oTableId.Get_ById(sId);
-        if (oElement && (oElement instanceof Paragraph || oElement instanceof CTable) && oElement.Is_UseInDocument())
-            return true;
-    }
-
-    return false;
-};
 CTrackRevisionsManager.prototype.Get_AllChanges = function()
 {
 	this.CompleteTrackChanges();
@@ -27116,12 +27450,7 @@ CTrackRevisionsManager.prototype.Get_AllChanges = function()
 };
 CTrackRevisionsManager.prototype.private_IsAllParagraphsChecked = function()
 {
-	for (var sId in this.CheckElements)
-	{
-		return false;
-	}
-
-	return true;
+	return (!this.CheckArray.length);
 };
 /**
  * Завершаем проверку всех элементов на наличие рецензирования
@@ -27141,30 +27470,39 @@ CTrackRevisionsManager.prototype.CompleteTrackChangesForElements = function(arrE
 	var isChecked = false;
 	for (var nIndex = 0, nCount = arrElements.length; nIndex < nCount; ++nIndex)
 	{
-		var sElementId = arrElements[nIndex].GetId();
-		if (this.private_TrackChangesForSingleElement(sElementId))
-			isChecked = true;
+		for (var nCheckIndex = 0, nCheckCount = this.CheckArray.length; nCheckIndex < nCheckCount; ++nCheckIndex)
+		{
+			if (this.CheckArray[nCheckIndex] === arrElements[nIndex])
+			{
+				if (this.private_TrackChangesForSingleElement(nCheckIndex))
+					isChecked = true;
+
+				break;
+			}
+		}
 	}
 
 	return isChecked;
 };
-CTrackRevisionsManager.prototype.private_TrackChangesForSingleElement = function(sId)
+CTrackRevisionsManager.prototype.private_TrackChangesForSingleElement = function(nIndex)
 {
-	if (this.CheckElements[sId])
+	var oElement = this.CheckArray[nIndex];
+	if (oElement)
 	{
-		delete this.CheckElements[sId];
-		var oElement = g_oTableId.Get_ById(sId);
-		if (oElement && (oElement instanceof Paragraph || oElement instanceof CTable) && oElement.Is_UseInDocument())
+		if (nIndex === this.CheckArray.length - 1)
+			this.CheckArray.length = this.CheckArray.length - 1;
+		else
+			this.CheckArray.splice(nIndex, 1);
+
+		if (oElement.Is_UseInDocument())
 		{
+			var sId = oElement.GetId();
 			var isHaveChanges = !!this.Changes[sId];
 
 			this.private_RemoveChangeObject(sId);
 			oElement.CheckRevisionsChanges(this);
 
-			if (!isHaveChanges && !this.Changes[sId])
-				return false;
-
-			return true;
+			return !(!isHaveChanges && !this.Changes[sId]);
 		}
 	}
 
@@ -27254,7 +27592,7 @@ CTrackRevisionsManager.prototype.private_CheckChangeObject = function(sId)
 {
 	var oElement = AscCommon.g_oTableId.Get_ById(sId);
 	if (!oElement)
-		return;
+		return false;
 
 	if (!this.Changes[sId])
 		this.Changes[sId] = [];
@@ -27289,7 +27627,7 @@ CTrackRevisionsManager.prototype.private_CheckChangeObject = function(sId)
 		nAddPosition = this.ChangesOutline.length;
 
 	if (nAddPosition === nDeletePosition || (-1 !== nAddPosition && -1 !== nDeletePosition && nDeletePosition === nAddPosition - 1))
-		return;
+		return true;
 
 	if (-1 !== nDeletePosition)
 	{
@@ -27300,6 +27638,8 @@ CTrackRevisionsManager.prototype.private_CheckChangeObject = function(sId)
 	}
 
 	this.ChangesOutline.splice(nAddPosition, 0, oElement);
+
+	return true;
 };
 CTrackRevisionsManager.prototype.private_CompareDocumentPositions = function(oDocPos1, oDocPos2)
 {
@@ -28234,17 +28574,27 @@ function CDocumentChangeTextCaseEngine(nType)
 	this.ChangeType    = nType;
 	this.StartSentence = true;
 	this.WordBuffer    = [];
+	this.currentSentence = "";
+	this.word = "";
+	this.lineWords = 0;
 }
 CDocumentChangeTextCaseEngine.prototype.Reset = function()
 {
 	this.StartSentence = true;
 	this.WordBuffer    = [];
+	this.currentSentence = "";
+	this.word = "";
+	//this.SentenceSettings = [];
+	//this.flag = 0;
+	this.lineWords = 0;
 };
 CDocumentChangeTextCaseEngine.prototype.FlushWord = function()
 {
-	var isFirstCapital        = false;
-	var isAllCapital          = true;
-	var isAllExceptFirstLower = true;
+	var sCurrentWord  = "";
+	var bNeddToChange = true;
+	var bIsAllUpper   = true;
+	var bIsAllLower   = true;
+	var bIsProperName = true;
 
 	for (var nIndex = 0, nCount = this.WordBuffer.length; nIndex < nCount; ++nIndex)
 	{
@@ -28252,24 +28602,45 @@ CDocumentChangeTextCaseEngine.prototype.FlushWord = function()
 		var nLowerCode = String.fromCharCode(nCharCode).toLowerCase().charCodeAt(0);
 		var nUpperCode = String.fromCharCode(nCharCode).toUpperCase().charCodeAt(0);
 
-		if (nUpperCode === nCharCode && nLowerCode !== nCharCode)
+		if (nIndex === 0 && nCharCode === nLowerCode)
+			bIsProperName = false;
+		if (nCharCode === nLowerCode)
+			bIsAllUpper = false;
+		if (nCharCode === nUpperCode)
 		{
-			if (0 === nIndex)
-				isFirstCapital = true;
-			else
-				isAllExceptFirstLower = false;
+			bIsAllLower = false;
+			if (nIndex !== 0)
+				bIsProperName = false;
 		}
-		else
-		{
-			isAllCapital = false;
-		}
+		sCurrentWord += String.fromCharCode(nCharCode);
 	}
 
+	if (sCurrentWord)
+	{
+		if (bIsProperName)
+		{
+			bNeddToChange = false;
+		}
+		else if (bIsAllUpper)
+		{
+			bNeddToChange = false;
+		}
+		else if (bIsAllLower)
+		{
+			bNeddToChange = false;
+		}
+		else 
+		{
+			bNeddToChange = true;
+		}
+	}
+	var bFlagForCheck = false;
 	var nCaseType = this.ChangeType;
 	for (var nIndex = 0, nCount = this.WordBuffer.length; nIndex < nCount; ++nIndex)
 	{
 		if (!this.WordBuffer[nIndex].Change)
 			continue;
+		bFlagForCheck = true;
 
 		var oRun      = this.WordBuffer[nIndex].Run;
 		var nInRunPos = this.WordBuffer[nIndex].Pos;
@@ -28292,9 +28663,12 @@ CDocumentChangeTextCaseEngine.prototype.FlushWord = function()
 			else if (nUpperCode === nCharCode
 				&& (Asc.c_oAscChangeTextCaseType.ToggleCase === nCaseType
 					|| Asc.c_oAscChangeTextCaseType.LowerCase === nCaseType
-					|| (Asc.c_oAscChangeTextCaseType.CapitalizeWords === nCaseType && 0 !== nIndex && !isAllCapital)
-					|| (Asc.c_oAscChangeTextCaseType.SentenceCase === nCaseType && !isAllCapital
-						&& (0 !== nIndex || (!this .StartSentence && !isAllExceptFirstLower)))))
+					|| (Asc.c_oAscChangeTextCaseType.CapitalizeWords === nCaseType && 0 !== nIndex && bNeddToChange)
+					|| (Asc.c_oAscChangeTextCaseType.CapitalizeWords === nCaseType && this.SentenceSettings[0].allFirst === true && this.SentenceSettings[0].sentenceMistakes === true && !this.SentenceSettings[0].allUpperWithoutFirst && 0 !== nIndex)
+					|| (Asc.c_oAscChangeTextCaseType.SentenceCase === nCaseType && this.GlobalSettings === true && this.isAllinTable === false && !(this.StartSentence && 0 === nIndex))
+					|| (Asc.c_oAscChangeTextCaseType.SentenceCase === nCaseType && this.isAllinTable === true && this.SentenceSettings[0].allFirst === true && this.SentenceSettings[0].sentenceMistakes === true && !this.SentenceSettings[0].allUpperWithoutFirst && !(this.StartSentence && 0 === nIndex))
+					|| (Asc.c_oAscChangeTextCaseType.SentenceCase === nCaseType && bNeddToChange && !(this.StartSentence && 0 === nIndex))
+					))
 			{
 				oRun.AddToContent(nInRunPos, new ParaText(nLowerCode), false);
 				oRun.RemoveFromContent(nInRunPos + 1, 1, false);
@@ -28302,6 +28676,15 @@ CDocumentChangeTextCaseEngine.prototype.FlushWord = function()
 		}
 	}
 
+	if (this.WordBuffer.length > 0 && bFlagForCheck && (Asc.c_oAscChangeTextCaseType.CapitalizeWords === nCaseType || Asc.c_oAscChangeTextCaseType.SentenceCase === nCaseType))
+	{
+		this.lineWords++;
+		if (this.lineWords === this.SentenceSettings[0].wordCount)
+		{
+			this.SentenceSettings.splice(0, 1);
+			this.lineWords = 0;
+		}
+	}
 	if (this.WordBuffer.length > 0)
 		this.StartSentence = false;
 
@@ -28319,7 +28702,83 @@ CDocumentChangeTextCaseEngine.prototype.SetStartSentence = function(isStart)
 {
 	this.StartSentence = isStart;
 };
-
+CDocumentChangeTextCaseEngine.prototype.GetCaseType = function()
+{
+	return this.ChangeType;
+};
+CDocumentChangeTextCaseEngine.prototype.CheckEachWord = function(sElement)
+{
+	var el1 = sElement.slice(1);
+	if (sElement[0] === sElement[0].toUpperCase() && el1 === el1.toLowerCase())
+	{
+		return true;
+	}
+	if (sElement === sElement.toUpperCase())
+	{
+		return true;
+	}
+	if (sElement === sElement.toLowerCase())
+	{
+		return true;
+	}
+	return false;
+};
+CDocumentChangeTextCaseEngine.prototype.CheckWords = function(oEngine)
+{
+	var sett = {
+		allFirst: true,
+		sentenceMistakes: true,
+		allUpperWithoutFirst: true,
+		wordCount: 0
+	};
+	var wordsInSentece = oEngine.currentSentence.split(/[\-\ \|]/);
+	
+	for (var k = 0; k < wordsInSentece.length; k++)
+	{
+		if (wordsInSentece[k] === "")
+		{
+			wordsInSentece.splice(k, 1);
+			k--;
+		}
+	}
+	sett.wordCount = wordsInSentece.length;
+	if (wordsInSentece.length !== 0)
+	{
+		for (var j = 0; j < wordsInSentece.length; j++)
+		{
+			if (wordsInSentece[j][0] !== wordsInSentece[j][0].toUpperCase())
+			{
+				sett.allFirst = false;
+			}
+			if (!this.CheckEachWord(wordsInSentece[j]))
+			{
+				sett.sentenceMistakes = false;
+			}
+			if (oEngine.CurrentParagraph === 0)
+			{
+				if (sett.allFirst === false || sett.sentenceMistakes === false)
+				{
+					oEngine.GlobalSettings = false;
+				}
+			}
+			if (wordsInSentece.length > 1 && j >= 1)
+			{
+				if (wordsInSentece[j] !== wordsInSentece[j].toUpperCase())
+				{
+					sett.allUpperWithoutFirst = false;
+				}
+			}
+		}
+		var elem1 = wordsInSentece[0].slice(1);
+		if (!(wordsInSentece[0][0] === wordsInSentece[0][0].toUpperCase() && elem1 === elem1.toLowerCase()))
+		{
+			sett.allUpperWithoutFirst = false;
+		}
+		oEngine.SentenceSettings[oEngine.flag] = sett;
+		oEngine.flag++;
+	}
+	  oEngine.currentSentence = "";
+};
 
 //-------------------------------------------------------------export---------------------------------------------------
 window['Asc']            = window['Asc'] || {};

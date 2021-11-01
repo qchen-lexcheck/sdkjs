@@ -1470,7 +1470,7 @@
 
 							var currentRange = worksheet.model.getCell3(row, col);
 							var textRange = currentRange.getValueWithFormat();
-							if (textRange !== '') {
+							if (textRange !== '' && textRange !== undefined) {
 								res += textRange;
 							}
 						}
@@ -3454,6 +3454,10 @@
 						}
 
 						if (13 === Code) {
+							if (i === length - 1) {
+								addTextIntoCell(rowCounter, colCounter, sCurChar);
+								sCurChar = "";
+							}
 							continue;
 						}
 

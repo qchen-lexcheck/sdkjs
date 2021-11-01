@@ -113,6 +113,18 @@ CGraphicFrame.prototype.Is_DrawingShape = function(bRetShape)
         }
         return false;
 };
+CGraphicFrame.prototype.IsTableFirstRowOnNewPage = function()
+{
+    return false;
+};
+CGraphicFrame.prototype.IsBlockLevelSdtContent = function()
+{
+    return false;
+};
+CGraphicFrame.prototype.IsBlockLevelSdtFirstOnNewPage = function()
+{
+    return false;
+};
 
 CGraphicFrame.prototype.handleUpdatePosition= function()
     {
@@ -843,10 +855,12 @@ CGraphicFrame.prototype.draw = function(graphics)
             graphics._e();
             return;
         }
+        if(graphics.animationDrawer) {
+            graphics.animationDrawer.drawObject(this, graphics);
+            return;
+        }
         if(this.graphicObject)
         {
-
-
             graphics.SaveGrState();
             graphics.transform3(this.transform);
             graphics.SetIntegerGrid(true);

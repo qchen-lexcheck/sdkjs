@@ -184,7 +184,7 @@ function Paragraph(DrawingDocument, Parent, bFromPresentation)
 
     // Добавляем данный класс в таблицу Id (обязательно в конце конструктора)
     g_oTableId.Add( this, this.Id );
-    if(bFromPresentation === true)
+    if(bFromPresentation === true && History.Is_On())
     {
         this.Save_StartState();
     }
@@ -2194,7 +2194,7 @@ Paragraph.prototype.Internal_Draw_3 = function(CurPage, pGraphics, Pr)
 			//----------------------------------------------------------------------------------------------------------
 			if (SdtHighlightColor || FormsHighlight)
 			{
-				var oSdtBounds, oInlineSdt, isForm;
+				var oSdtBounds, oInlineSdt, isForm, oFormShd;
 				var nPrevColorState = 0;
 
 				for (var nSdtIndex = 0, nSdtCount = PDSH.InlineSdt.length; nSdtIndex < nSdtCount; ++nSdtIndex)
@@ -2202,8 +2202,32 @@ Paragraph.prototype.Internal_Draw_3 = function(CurPage, pGraphics, Pr)
 					oInlineSdt = PDSH.InlineSdt[nSdtIndex];
 					isForm     = oInlineSdt.IsForm();
 					oSdtBounds = PDSH.InlineSdt[nSdtIndex].GetRangeBounds(CurLine, CurRange);
+					oFormShd   = isForm ? oInlineSdt.GetFormPr().GetShd() : null;
 
-					if (isForm && FormsHighlight && !oInlineSdt.IsCurrent())
+					if (oFormShd && !oFormShd.IsNil())
+					{
+						var oFormShdColor = oFormShd.GetSimpleColor(this.GetTheme(), this.GetColorMap());
+						if (oInlineSdt.IsCurrent())
+						{
+							if (3 !== nPrevColorState)
+							{
+								pGraphics.b_color1(oFormShdColor.r, oFormShdColor.g, oFormShdColor.b, 255);
+								nPrevColorState = 3;
+							}
+						}
+						else
+						{
+							if (4 !== nPrevColorState)
+							{
+								pGraphics.b_color1(oFormShdColor.r * (201 / 255) | 0, oFormShdColor.g * (225 / 255) | 0, oFormShdColor.b, 255);
+								nPrevColorState = 4;
+							}
+						}
+
+						if (oInlineSdt.IsFixedForm())
+							oSdtBounds = oInlineSdt.GetFixedFormBounds();
+					}
+					else if (isForm && FormsHighlight && !oInlineSdt.IsCurrent())
 					{
 						if (1 !== nPrevColorState)
 						{
@@ -2213,7 +2237,6 @@ Paragraph.prototype.Internal_Draw_3 = function(CurPage, pGraphics, Pr)
 
 						if (oInlineSdt.IsFixedForm())
 							oSdtBounds = oInlineSdt.GetFixedFormBounds();
-
 					}
 					else if (!isForm && SdtHighlightColor)
 					{
@@ -4230,16 +4253,8 @@ Paragraph.prototype.Add = function(Item)
 					}
 					else if (null !== RItem && null !== LItem && para_Text === RItem.Type && para_Text === LItem.Type && false === RItem.IsPunctuation() && false === LItem.IsPunctuation())
 					{
-						var oLogicDocument = this.GetLogicDocument();
-						var oParent        = this.GetParent();
-						var oDocContent    = oParent ? oParent.GetTopDocumentContent() : null;
-						var oDocPos        = null;
-
-						if (oLogicDocument)
-						{
-							oDocPos = oDocContent.GetContentPosition(false);
-							oLogicDocument.TrackDocumentPositions([oDocPos]);
-						}
+						var arrParaPos = [this.GetContentPosition(false)];
+						this.TrackContentPositions(arrParaPos);
 
 						var SearchSPos = new CParagraphSearchPos();
 						var SearchEPos = new CParagraphSearchPos();
@@ -4260,12 +4275,8 @@ Paragraph.prototype.Add = function(Item)
 						// Убираем селект
 						this.RemoveSelection();
 
-						if (oDocPos)
-						{
-							oLogicDocument.RefreshDocumentPositions([oDocPos]);
-							oDocContent.SetContentPosition(oDocPos, 0, 0);
-						}
-
+						this.RefreshContentPositions(arrParaPos);
+						this.SetContentPosition(arrParaPos[0], 0, 0);
 					}
 					else
 					{
@@ -4613,16 +4624,8 @@ Paragraph.prototype.IncDec_FontSize = function(bIncrease)
 			}
 			else if (null !== RItem && null !== LItem && para_Text === RItem.Type && para_Text === LItem.Type && false === RItem.IsPunctuation() && false === LItem.IsPunctuation())
 			{
-				var oLogicDocument = this.GetLogicDocument();
-				var oParent        = this.GetParent();
-				var oDocContent    = oParent ? oParent.GetTopDocumentContent() : null;
-				var oDocPos        = null;
-
-				if (oLogicDocument)
-				{
-					oDocPos = oDocContent.GetContentPosition(false);
-					oLogicDocument.TrackDocumentPositions([oDocPos]);
-				}
+				var arrParaPos = [this.GetContentPosition(false)];
+				this.TrackContentPositions(arrParaPos);
 
 				var SearchSPos = new CParagraphSearchPos();
 				var SearchEPos = new CParagraphSearchPos();
@@ -4643,11 +4646,8 @@ Paragraph.prototype.IncDec_FontSize = function(bIncrease)
 				// Убираем селект
 				this.RemoveSelection();
 
-				if (oDocPos)
-				{
-					oLogicDocument.RefreshDocumentPositions([oDocPos]);
-					oDocContent.SetContentPosition(oDocPos, 0, 0);
-				}
+				this.RefreshContentPositions(arrParaPos);
+				this.SetContentPosition(arrParaPos[0], 0, 0);
 			}
 			else
 			{
@@ -7591,8 +7591,11 @@ Paragraph.prototype.Selection_SetEnd = function(X, Y, CurPage, MouseEvent, bTabl
 {
 	var PagesCount = this.Pages.length;
 
+	var isFixedForm = this.IsInFixedForm();
+
 	// В сносках нельзя делать ExtendToPos, смотри замечание в CFootnotesController.prototype.EndSelection
-	if (this.bFromDocument && this.LogicDocument
+	if (!isFixedForm
+		&& this.bFromDocument && this.LogicDocument
 		&& true === this.LogicDocument.CanEdit()
 		&& null === this.Parent.IsHdrFtr(true)
 		&& !this.Parent.IsFootnote()
@@ -7618,7 +7621,7 @@ Paragraph.prototype.Selection_SetEnd = function(X, Y, CurPage, MouseEvent, bTabl
 	if (true === SearchPosXY.End || true === this.Is_Empty())
 	{
 		var LastRange = this.Lines[this.Lines.length - 1].Ranges[this.Lines[this.Lines.length - 1].Ranges.length - 1];
-		if (!this.Parent.IsFootnote() && CurPage >= PagesCount - 1 && X > LastRange.W && MouseEvent.ClickCount >= 2 && Y <= this.Pages[PagesCount - 1].Bounds.Bottom)
+		if (!isFixedForm && !this.Parent.IsFootnote() && CurPage >= PagesCount - 1 && X > LastRange.W && MouseEvent.ClickCount >= 2 && Y <= this.Pages[PagesCount - 1].Bounds.Bottom)
 		{
 			if (this.bFromDocument && false === this.LogicDocument.Document_Is_SelectionLocked(AscCommon.changestype_None, {
 					Type      : AscCommon.changestype_2_Element_and_Type,
@@ -11688,7 +11691,8 @@ Paragraph.prototype.Is_Inline = function()
 	if (undefined === this.Parent || (!(this.Parent instanceof CDocument) && (undefined === this.Parent.Parent || !(this.Parent.Parent instanceof CHeaderFooter))))
 		return true;
 
-	if (undefined != this.Pr.FramePr && Asc.c_oAscYAlign.Inline !== this.Pr.FramePr.YAlign)
+	var oFramePr = this.Get_FramePr();
+	if (oFramePr && !oFramePr.IsInline())
 		return false;
 
 	return true;
@@ -12637,11 +12641,19 @@ Paragraph.prototype.Continue = function(NewParagraph)
 	}
 	else
 	{
-		var EndPos = this.Get_EndPos2(false);
 		var CurPos = this.Get_ParaContentPos(false, false);
-		this.Set_ParaContentPos(EndPos, true, -1, -1);
-		TextPr = this.Get_TextPr(this.Get_ParaContentPos(false, false)).Copy();
-		this.Set_ParaContentPos(CurPos, false, -1, -1, false);
+
+		if (!this.IsCursorAtEnd(CurPos))
+		{
+			var EndPos = this.Get_EndPos2(false);
+			this.Set_ParaContentPos(EndPos, true, -1, -1);
+			TextPr = this.Get_TextPr(this.Get_ParaContentPos(false, false)).Copy();
+			this.Set_ParaContentPos(CurPos, false, -1, -1, false);
+		}
+		else
+		{
+			TextPr = this.Get_TextPr(this.Get_ParaContentPos(false, false)).Copy();
+		}
 
 		// 1. Выделение не продолжаем
 		// 2. Стиль сноски не продолжаем
@@ -14477,6 +14489,9 @@ Paragraph.prototype.SetContentSelection = function(StartDocPos, EndDocPos, Depth
 };
 Paragraph.prototype.SetContentPosition = function(DocPos, Depth, Flag)
 {
+	if (!DocPos)
+		return;
+
     if (0 === Flag && (!DocPos[Depth] || this !== DocPos[Depth].Class))
         return;
 
@@ -16674,6 +16689,45 @@ Paragraph.prototype.LoadSelectionState = function(oState)
 	this.CurPos.RealY      = oState.CurPos.RealY;
 	this.CurPos.PagesPos   = oState.CurPos.PagesPos;
 };
+/**
+ * Данная функция начинает отслеживать массив заданных позиций внутри параграфа
+ * @param {Array} arrContentPositions
+ */
+Paragraph.prototype.TrackContentPositions = function(arrContentPositions)
+{
+	var oLogicDocument = this.GetLogicDocument();
+	if (oLogicDocument)
+		oLogicDocument.TrackDocumentPositions(arrContentPositions);
+};
+/**
+ * Обновляем позицию
+ * @param {Array} arrContentPositions
+ */
+Paragraph.prototype.RefreshContentPositions = function(arrContentPositions)
+{
+	var oLogicDocument = this.GetLogicDocument();
+	if (oLogicDocument)
+	{
+		oLogicDocument.RefreshDocumentPositions(arrContentPositions);
+		for (var nIndex = 0, nCount = arrContentPositions.length; nIndex < nCount; ++nIndex)
+		{
+			var isFind = false;
+			var oPosition = arrContentPositions[nIndex];
+			for (var nPos = 0, nLen = oPosition.length; nPos < nLen; ++nPos)
+			{
+				if (oPosition[nPos].Class === this)
+				{
+					arrContentPositions[nIndex] = oPosition.slice(nPos);
+					isFind = true;
+					break;
+				}
+			}
+
+			if (!isFind)
+				arrContentPositions[nIndex] = null;
+		}
+	}
+};
 Paragraph.prototype.UpdateLineNumbersInfo = function()
 {
 	if (this.IsCountLineNumbers() && this.Parent && this.LogicDocument && this.LogicDocument === this.Parent.GetDocumentContentForRecalcInfo())
@@ -16711,7 +16765,7 @@ Paragraph.prototype.UpdateLineNumbersInfo = function()
 };
 Paragraph.prototype.GetLineNumbersInfo = function(isNewPage)
 {
-	if (!this.LineNumbersInfo && this.Pages.length <= 0 || this.Lines.length <= 0)
+	if (!this.LineNumbersInfo || this.Pages.length <= 0 || this.Lines.length <= 0)
 		return -1;
 
 	if (isNewPage && this.Pages.length > 1)
@@ -18340,29 +18394,25 @@ CRunRecalculateObject.prototype =
         Obj.Load_MathInfo(this.MathInfo);
     },
 
-    Save_RunContent : function(Run, Copy)
-    {
-        var ContentLen = Run.Content.length;
-        for ( var Index = 0, Index2 = 0; Index < ContentLen; Index++ )
-        {
-            var Item = Run.Content[Index];
+	SaveRunContent : function(oRun, isCopy)
+	{
+		for (var nIndex = 0, nIndex2 = 0, nCount = oRun.Content.length; nIndex < nCount; ++nIndex)
+		{
+			var oItem = oRun.Content[nIndex];
+			if (oItem.IsNeedSaveRecalculateObject())
+				this.Content[nIndex2++] = oItem.SaveRecalculateObject(isCopy);
+		}
+	},
 
-			if (para_PageNum === Item.Type || para_Drawing === Item.Type || para_FieldChar === Item.Type || para_Separator === Item.Type || para_ContinuationSeparator === Item.Type)
-				this.Content[Index2++] = Item.SaveRecalculateObject(Copy);
-        }
-    },
-
-    Load_RunContent : function(Run)
-    {
-        var Count = Run.Content.length;
-        for ( var Index = 0, Index2 = 0; Index < Count; Index++ )
-        {
-            var Item = Run.Content[Index];
-
-			if (para_PageNum === Item.Type || para_Drawing === Item.Type || para_FieldChar === Item.Type || para_Separator === Item.Type || para_ContinuationSeparator === Item.Type)
-				Item.LoadRecalculateObject(this.Content[Index2++]);
-        }
-    },
+	LoadRunContent : function(oRun)
+	{
+		for (var nIndex = 0, nIndex2 = 0, nCount = oRun.Content.length; nIndex < nCount; ++nIndex)
+		{
+			var oItem = oRun.Content[nIndex];
+			if (oItem.IsNeedSaveRecalculateObject())
+				oItem.LoadRecalculateObject(this.Content[nIndex2++]);
+		}
+	},
 
     Get_DrawingFlowPos : function(FlowPos)
     {

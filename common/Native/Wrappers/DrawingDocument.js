@@ -546,53 +546,25 @@ function CTableOutlineDr()
     }
 }
 
-function CDrawingCollaborativeTarget()
+function CDrawingCollaborativeTarget(DrawingDocument)
 {
-	this.Id = "";
-	this.ShortId = "";
-
-	this.X = 0;
-	this.Y = 0;
-	this.Size = 0;
-	this.Page = -1;
-
-	this.Color = null;
-	this.Transform = null;
-
-	this.HtmlElement = null;
-	this.HtmlElementX = 0;
-	this.HtmlElementY = 0;
-
-	this.Color = null;
-
-	this.Style = "";
+    AscCommon.CDrawingCollaborativeTargetBase.call(this);
+    this.DrawingDocument = DrawingDocument;
 }
-CDrawingCollaborativeTarget.prototype =
+CDrawingCollaborativeTarget.prototype = Object.create(AscCommon.CDrawingCollaborativeTargetBase.prototype);
+CDrawingCollaborativeTarget.prototype.CheckPosition = function (_x, _y, _size, _page, _transform)
 {
-	CheckPosition: function (_drawing_doc, _x, _y, _size, _page, _transform)
-	{
-		 // 2) определяем размер
-		 this.Transform = _transform;
-		 this.Size = _size;
-
-		 var _old_x = this.X;
-		 var _old_y = this.Y;
-		 var _old_page = this.Page;
-
-		 this.X = _x;
-		 this.Y = _y;
-		 this.Page = _page;
-	},
-
-	Remove: function (_drawing_doc)
-	{
-
-  },
-
-	Update: function (_drawing_doc)
-	{
-
-  }
+     this.Transform = _transform;
+     this.Size = _size;
+     this.X = _x;
+     this.Y = _y;
+     this.Page = _page;
+};
+CDrawingCollaborativeTarget.prototype.Remove = function ()
+{
+};
+CDrawingCollaborativeTarget.prototype.Update = function ()
+{
 };
 
 function CDrawingDocument()
@@ -759,7 +731,16 @@ CDrawingDocument.prototype =
     // is freeze
     IsFreezePage : function(pageIndex)
     {
-        return this.Native["DD_IsFreezePage"](pageIndex);
+        if (this.Native["DD_IsFreezePage"](pageIndex))
+            return true;
+        if (this.m_oLogicDocument)
+        {
+            if (pageIndex >= this.m_oLogicDocument.Pages.length)
+                return true;
+            else if (!this.m_oLogicDocument.CanDrawPage(pageIndex))
+                return true;
+        }
+        return false;
     },
 
     RenderPageToMemory : function(pageIndex)
@@ -875,6 +856,7 @@ CDrawingDocument.prototype =
         this.TargetPos.X = x;
         this.TargetPos.Y = y;
         this.TargetPos.Page = pageIndex;
+        this.m_lCurrentPage = pageIndex;
 
         this.LogicDocument.Set_TargetPos(x, y, pageIndex);
         this.UpdateTargetCheck = true;
@@ -2015,9 +1997,6 @@ CDrawingDocument.prototype =
     {
         check_KeyboardEvent(e);
 
-        if (this.IsFreezePage(this.m_lCurrentPage))
-            return;
-
         this.StartUpdateOverlay();
 
         this.IsKeyDownButNoPress = true;
@@ -2038,9 +2017,6 @@ CDrawingDocument.prototype =
         if (false === this.bIsUseKeyPress)
             return;
 
-        if (this.IsFreezePage(this.m_lCurrentPage))
-            return;
-
         check_KeyboardEvent(e);
 
         this.StartUpdateOverlay();
@@ -2051,9 +2027,6 @@ CDrawingDocument.prototype =
 
     OnKeyboardEvent : function(_params)
     {
-        if (this.IsFreezePage(this.m_lCurrentPage))
-            return;
-
         var _len = _params.length / 4;
 
         //this.LogicDocument.TurnOff_Recalculate();
@@ -3007,14 +2980,14 @@ CDrawingDocument.prototype =
   		{
   			if (_id == this.CollaborativeTargets[i].Id)
   			{
-  				this.CollaborativeTargets[i].CheckPosition(this, _x, _y, _size, _page, _transform);
+  				this.CollaborativeTargets[i].CheckPosition(_x, _y, _size, _page, _transform);
   				return;
   			}
   		}
-  		var _target = new CDrawingCollaborativeTarget();
+  		var _target = new CDrawingCollaborativeTarget(this);
   		_target.Id = _id;
   		_target.ShortId = _shortId;
-  		_target.CheckPosition(this, _x, _y, _size, _page, _transform);
+  		_target.CheckPosition(_x, _y, _size, _page, _transform);
   		this.CollaborativeTargets[this.CollaborativeTargets.length] = _target;
   	},
   	Collaborative_RemoveTarget : function (_id)

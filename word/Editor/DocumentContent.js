@@ -538,6 +538,11 @@ CDocumentContent.prototype.Get_NearestPos = function(CurPage, X, Y, bAnchor, Dra
 	if (true != bAnchor && (0 < ContentPos || CurPage > 0) && ContentPos === this.Pages[CurPage].Pos && this.Pages[CurPage].EndPos > this.Pages[CurPage].Pos && type_Paragraph === this.Content[ContentPos].GetType() && true === this.Content[ContentPos].IsContentOnFirstPage())
 		ContentPos++;
 
+	// Заглушка для плохих Fixed-форм
+	var oShape = this.Is_DrawingShape(true);
+	if (oShape && oShape.isForm())
+		ContentPos = 0;
+
 	var ElementPageIndex = this.private_GetElementPageIndexByXY(ContentPos, X, Y, CurPage);
 	return this.Content[ContentPos].Get_NearestPos(ElementPageIndex, X, Y, bAnchor, Drawing);
 };
@@ -902,10 +907,10 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
 
 				var FrameHRule = (undefined === FramePr.HRule ? (undefined !== Frame_YLimit ? Asc.linerule_AtLeast : Asc.linerule_Auto) : FramePr.HRule);
 
-				if (undefined === Frame_XLimit)
+				if (undefined === Frame_XLimit || 0 === AscCommon.MMToTwips(Frame_XLimit))
                     Frame_XLimit = Page_Field_R - Page_Field_L;
 
-                if (undefined === Frame_YLimit || Asc.linerule_Auto === FrameHRule)
+                if (undefined === Frame_YLimit || 0 === AscCommon.MMToTwips(Frame_YLimit) || Asc.linerule_Auto === FrameHRule)
                     Frame_YLimit = Page_H;
 
                 for (var TempIndex = Index; TempIndex < Index + FlowCount; TempIndex++)
@@ -950,7 +955,7 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
 
                 // Обработаем "авто" ширину рамки. Ширина "авто" может быть в случае, когда значение W в FramePr
                 // отсутствует, когда, у нас ровно 1 параграф, с 1 строкой.
-                if (Element.IsParagraph() && -1 === FrameW && 1 === FlowCount && 1 === Element.Lines.length && undefined === FramePr.Get_W())
+                if (Element.IsParagraph() && -1 === FrameW && 1 === FlowCount && 1 === Element.Lines.length && (undefined === FramePr.Get_W() || 0 === AscCommon.MMToTwips(FramePr.Get_W())))
                 {
                     FrameW     = Element.GetAutoWidthForDropCap();
                     var ParaPr = Element.Get_CompiledPr2(false).ParaPr;
@@ -967,7 +972,7 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
                 }
 				else if (-1 === FrameW)
 				{
-					if (Element.IsTable() && !FramePr.Get_W())
+					if (Element.IsTable() && (!FramePr.Get_W() || 0 === AscCommon.MMToTwips(FramePr.Get_W())))
 					{
 						FrameW = nMaxGridWidth;
 					}
@@ -980,24 +985,10 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
 				var nGapLeft  = nMaxGapLeft;
 				var nGapRight = nMaxGridWidthRightGap > FrameW ? nMaxGridWidthRightGap - FrameW : 0;
 
-				switch (FrameHRule)
-                {
-                    case Asc.linerule_Auto :
-                        break;
-                    case Asc.linerule_AtLeast :
-                    {
-                        if (FrameH < FramePr.H)
-                            FrameH = FramePr.H;
-
-                        break;
-                    }
-
-                    case Asc.linerule_Exact:
-                    {
-                        FrameH = FramePr.H;
-                        break;
-                    }
-                }
+				if (0 !== AscCommon.MMToTwips(FramePr.H) && ((Asc.linerule_AtLeast === FrameHRule && FrameH < FramePr.H) || Asc.linerule_Exact === FrameHRule))
+				{
+					FrameH = FramePr.H;
+				}
 
                 //--------------------------------------------------------------------------------------------------
                 // 2. Рассчитаем положение рамки
@@ -1009,10 +1000,10 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
 
                 // Рассчитаем положение по горизонтали
                 var FrameX = 0;
-                if (undefined != FramePr.XAlign || undefined === FramePr.X)
+                if (undefined !== FramePr.XAlign || undefined === FramePr.X)
                 {
                     var XAlign = c_oAscXAlign.Left;
-                    if (undefined != FramePr.XAlign)
+                    if (undefined !== FramePr.XAlign)
                         XAlign = FramePr.XAlign;
 
                     switch (FrameHAnchor)
@@ -1081,7 +1072,7 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
 
                 // Рассчитаем положение по вертикали
                 var FrameY = 0;
-                if (undefined != FramePr.YAlign)
+                if (undefined !== FramePr.YAlign)
                 {
                     var YAlign = FramePr.YAlign;
                     // Случай c_oAscYAlign.Inline не обрабатывается, потому что такие параграфы считаются Inline
@@ -1136,7 +1127,7 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
                 else
                 {
                     var FramePrY = 0;
-                    if (undefined != FramePr.Y)
+                    if (undefined !== FramePr.Y)
                         FramePrY = FramePr.Y;
 
                     switch (FrameVAnchor)
@@ -1148,7 +1139,13 @@ CDocumentContent.prototype.Recalculate_Page               = function(PageIndex, 
                             FrameY = FramePrY + Y;
                             break;
                         case c_oAscVAnchor.Margin :
-                            FrameY = FramePrY + Page_Field_T;
+
+							// Если Y не задано, либо ровно 0, тогда MSWord считает это как привязка к тексту (баг 52903)
+							if (undefined === FramePr.Y || 0 === AscCommon.MMToTwips(FramePr.Y))
+								FrameY = Y + 0.001; // Погрешность, чтобы не сдвигалась предыдущая строка из-за обтекания
+							else
+								FrameY = FramePrY + Page_Field_T;
+
                             break;
                     }
                 }
@@ -2661,6 +2658,8 @@ CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
         //    новый параграф будет без списка).
         if (type_Paragraph === Item.GetType())
         {
+        	var isCheckAutoCorrect = false;
+
             // Если текущий параграф пустой и с нумерацией, тогда удаляем нумерацию и отступы левый и первой строки
             if (true !== bForceAdd && undefined != Item.GetNumPr() && true === Item.IsEmpty({SkipNewLine : true}) && true === Item.IsCursorAtBegin())
             {
@@ -2690,11 +2689,7 @@ CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
 					if (true === Item.IsCursorAtEnd())
 					{
 						if (!Item.Lock.Is_Locked())
-						{
-							var oParaEndRun = Item.GetParaEndRun();
-							if (oParaEndRun)
-								oParaEndRun.ProcessAutoCorrectOnParaEnd();
-						}
+							isCheckAutoCorrect = true;
 
 						var StyleId = Item.Style_Get();
 						var NextId  = undefined;
@@ -2758,7 +2753,18 @@ CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
                 }
 				NewParagraph.CheckSignatureLinesOnAdd();
             }
-        }
+
+			if (isCheckAutoCorrect)
+			{
+				var nContentPos = this.CurPos.ContentPos;
+
+				var oParaEndRun = Item.GetParaEndRun();
+				if (oParaEndRun)
+					oParaEndRun.ProcessAutoCorrectOnParaEnd();
+
+				this.CurPos.ContentPos = nContentPos;
+			}
+		}
 		else if (type_Table === Item.GetType() || type_BlockLevelSdt === Item.GetType())
 		{
 			// Если мы находимся в начале первого параграфа первой ячейки, и

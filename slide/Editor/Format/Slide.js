@@ -214,6 +214,8 @@ function Slide(presentation, slideLayout, slideNum)
 
     this.NotesWidth = -10.0;
 
+    this.animationPlayer = null;
+
     if(presentation)
     {
         this.Width = presentation.GetWidthMM();
@@ -684,7 +686,6 @@ Slide.prototype =
         this.slideComments = comments;
     },
 
-
     setShow: function(bShow)
     {
        History.Add(new AscDFH.CChangesDrawingsBool(this, AscDFH.historyitem_SlideSetShow, this.show, bShow));
@@ -761,7 +762,7 @@ Slide.prototype =
     {
         this.checkDrawingUniNvPr(item);
         var _pos = (AscFormat.isRealNumber(pos) && pos > -1 && pos <= this.cSld.spTree.length) ? pos : this.cSld.spTree.length;
-       History.Add(new AscDFH.CChangesDrawingsContentPresentation(this, AscDFH.historyitem_SlideAddToSpTree, _pos, [item], true));
+       History.Add(new AscDFH.CChangesDrawingsContentPresentation(this, AscDFH.historyitem_SlideAddToSpTree, _pos, [item], true, true));
         this.cSld.spTree.splice(_pos, 0, item);
         item.setParent2(this);
         if(this.collaborativeMarks) {
@@ -1254,6 +1255,13 @@ Slide.prototype =
 
     draw: function(graphics)
     {
+        //For animation testing
+        if (graphics.IsSlideBoundsCheckerType) {
+            if(editor.WordControl.DemonstrationManager && editor.WordControl.DemonstrationManager.Mode) {
+                graphics.rect(0, 0, this.Width, this.Height);
+                return;
+            }
+        }
         var _bounds, i;
         DrawBackground(graphics, this.backgroundFill, this.Width, this.Height);
         if(this.needMasterSpDraw())
@@ -1290,9 +1298,22 @@ Slide.prototype =
                 {
                     var oBounds = oSp.bounds;
                     graphics.transform3(oIdentityMtx);
-                    graphics.b_color1(oCollColor.r, oCollColor.g, oCollColor.b, 127);
-                    graphics.rect(oBounds.l - fDist, oBounds.t - fDist, oBounds.r - oBounds.l + 2*fDist, oBounds.b - oBounds.t + 2*fDist);
-                    graphics.df();
+                    if(graphics.put_GlobalAlpha)
+                    {
+                        graphics.put_GlobalAlpha(true, 0.5);
+                    }
+                    var dX = oBounds.l - fDist;
+                    var dY = oBounds.t - fDist;
+                    var dW = oBounds.r - oBounds.l + 2*fDist;
+                    var dH = oBounds.b - oBounds.t + 2*fDist;
+                    graphics.drawCollaborativeChanges(dX, dY, dW, dH, oCollColor);
+                    if(graphics.put_GlobalAlpha)
+                    {
+                        graphics.put_GlobalAlpha(false, 1);
+                    }
+                    //graphics.b_color1(oCollColor.r, oCollColor.g, oCollColor.b, 127);
+                    //graphics.rect(oBounds.l - fDist, oBounds.t - fDist, oBounds.r - oBounds.l + 2*fDist, oBounds.b - oBounds.t + 2*fDist);
+                    //graphics.df();
                 }
             }
             oSp.draw(graphics);
@@ -1669,6 +1690,36 @@ Slide.prototype =
         if(this.notesShape) {
             this.notesShape.createFontMap(oFontsMap);
         }
+    },
+
+    getAnimationPlayer: function() {
+        if(!this.animationPlayer) {
+            var oDemoManager = editor.WordControl.DemonstrationManager;
+            this.animationPlayer = new AscFormat.CAnimationPlayer(this, oDemoManager);
+        }
+        return this.animationPlayer;
+    },
+
+    isAdvanceAfterTransition: function() {
+        var oTransition = this.transition;
+        if(!oTransition) {
+            return false;
+        }
+        if(this.presentation) {
+            var oShowPr = this.presentation.showPr;
+            if(oShowPr && oShowPr.useTimings === false) {
+                return false;
+            }
+        }
+        return oTransition.SlideAdvanceAfter === true;
+    },
+
+    getAdvanceDuration: function() {
+        var oTransition = this.transition;
+        if(!oTransition) {
+            return 0;
+        }
+        return oTransition.SlideAdvanceDuration;
     }
 };
 

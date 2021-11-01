@@ -53,7 +53,7 @@
 	var c_oAscAxisType = Asc.c_oAscAxisType;
 	// ---------------------------------------------------------------------------------------------------------------
 
-	var c_oAscArrUserColors = [16757719, 7929702, 56805, 10081791, 12884479, 16751001, 6748927, 16762931, 6865407,
+	var c_oAscArrUserColors = [16757719, 56805, 10081791, 12884479, 16751001, 6748927, 16762931, 6865407,
 		15650047, 16737894, 3407768, 16759142, 10852863, 6750176, 16774656, 13926655, 13815039, 3397375, 11927347, 16752947,
 		9404671, 4980531, 16744678, 3407830, 15919360, 16731553, 52479, 13330175, 16743219, 3386367, 14221056, 16737966,
 		1896960, 65484, 10970879, 16759296, 16711680, 13496832, 62072, 49906, 16734720, 10682112, 7890687, 16731610, 65406,
@@ -2381,7 +2381,8 @@
 
 	asc_CTextFontFamily.prototype = {
 		asc_getName: function () {
-			return this.Name;
+			var _name = AscFonts.g_fontApplication ? AscFonts.g_fontApplication.NameToInterface[this.Name] : null;
+			return _name ? _name : this.Name;
 		}, asc_getIndex: function () {
 			return this.Index;
 		},
@@ -3163,6 +3164,10 @@
 		this.flipVInvert = null;
 		this.shadow = undefined;
 		this.anchor = null;
+
+		this.protectionLockText = null;
+		this.protectionLocked = null;
+		this.protectionPrint = null;
 	}
 
 	asc_CShapeProperty.prototype = {
@@ -3349,6 +3354,25 @@
 
 		asc_putAnchor: function(v){
 			this.anchor = v;
+		},
+		asc_getProtectionLockText: function(){
+			return this.protectionLockText;
+		},
+		asc_putProtectionLockText: function(v){
+			this.protectionLockText = v;
+		},
+		asc_getProtectionLocked: function(){
+			return this.protectionLocked;
+		},
+
+		asc_putProtectionLocked: function(v){
+			this.protectionLocked = v;
+		},
+		asc_getProtectionPrint: function(){
+			return this.protectionPrint;
+		},
+		asc_putProtectionPrint: function(v){
+			this.protectionPrint = v;
 		}
 	};
 
@@ -3570,6 +3594,10 @@
 			this.resetCrop =  obj.resetCrop != undefined ? obj.resetCrop : undefined;
 			this.anchor =  obj.anchor != undefined ? obj.anchor : undefined;
 
+			this.protectionLockText = obj.protectionLockText;
+			this.protectionLocked = obj.protectionLocked;
+			this.protectionPrint = obj.protectionPrint;
+
 		} else {
 			this.CanBeFlow = true;
 			this.Width = undefined;
@@ -3622,6 +3650,10 @@
 			this.flipV = undefined;
 			this.resetCrop = undefined;
 			this.anchor = undefined;
+
+			this.protectionLockText = undefined;
+			this.protectionLocked = undefined;
+			this.protectionPrint = undefined;
 		}
 	}
 
@@ -3792,10 +3824,10 @@
 			else if (window["AscDesktopEditor"] && window["AscDesktopEditor"]["GetImageOriginalSize"])
 			{
 				var _size = window["AscDesktopEditor"]["GetImageOriginalSize"](this.ImageUrl);
-				if (_size.W != 0 && _size.H != 0)
+				if (_size["W"] != 0 && _size["H"] != 0)
 				{
-					origW = _size.W;
-					origH = _size.H;
+					origW = _size["W"];
+					origH = _size["H"];
 				}
 			}
 
@@ -3937,6 +3969,25 @@
 
 		asc_putAnchor: function(v){
 			this.anchor = v;
+		},
+		asc_getProtectionLockText: function(){
+			return this.protectionLockText;
+		},
+		asc_putProtectionLockText: function(v){
+			this.protectionLockText = v;
+		},
+		asc_getProtectionLocked: function(){
+			return this.protectionLocked;
+		},
+
+		asc_putProtectionLocked: function(v){
+			this.protectionLocked = v;
+		},
+		asc_getProtectionPrint: function(){
+			return this.protectionPrint;
+		},
+		asc_putProtectionPrint: function(v){
+			this.protectionPrint = v;
 		}
 	};
 
@@ -5423,6 +5474,7 @@
 
 		this.isVisual     = (_object["isVisual"] != null) ? _object["isVisual"] : this.isVisual;
 		this.isModal      = (_object["isModal"] != null) ? _object["isModal"] : this.isModal;
+		this.isSystem     = (_object["isSystem"] != null) ? _object["isSystem"] : this.isSystem;
 		this.isInsideMode = (_object["isInsideMode"] != null) ? _object["isInsideMode"] : this.isInsideMode;
 		this.isCustomWindow = (_object["isCustomWindow"] != null) ? _object["isCustomWindow"] : this.isCustomWindow;
 
@@ -5432,6 +5484,8 @@
 		this.isUpdateOleOnResize = (_object["isUpdateOleOnResize"] != null) ? _object["isUpdateOleOnResize"] : this.isUpdateOleOnResize;
 
 		this.buttons = (_object["buttons"] != null) ? _object["buttons"] : this.buttons;
+
+		if (_object["events"] != null) this["set_Events"](_object["events"]);
 
 		this.size = (_object["size"] != null) ? _object["size"] : this.size;
 		this.initOnSelectionChanged = (_object["initOnSelectionChanged"] != null) ? _object["initOnSelectionChanged"] : this.initOnSelectionChanged;
@@ -5507,6 +5561,7 @@
 		this.name       = (_object["name"] != null) ? _object["name"] : this.name;
 		this.guid       = (_object["guid"] != null) ? _object["guid"] : this.guid;
 		this.baseUrl    = (_object["baseUrl"] != null) ? _object["baseUrl"] : this.baseUrl;
+		this.minVersion = (_object["minVersion"] != null) ? _object["minVersion"] : this.minVersion;
 		this.variations = [];
 		for (var i = 0; i < _object["variations"].length; i++)
 		{
@@ -6097,6 +6152,13 @@
 	prot["get_Shadow"] = prot.get_Shadow = prot["get_shadow"] = prot.get_shadow = prot["asc_getShadow"] = prot.asc_getShadow;
 	prot["put_Anchor"] = prot.put_Anchor = prot["asc_putAnchor"] = prot.asc_putAnchor;
 	prot["get_Anchor"] = prot.get_Anchor = prot["asc_getAnchor"] = prot.asc_getAnchor;
+	prot["get_ProtectionLockText"] = prot["asc_getProtectionLockText"] = prot.asc_getProtectionLockText;
+	prot["put_ProtectionLockText"] = prot["asc_putProtectionLockText"] = prot.asc_putProtectionLockText;
+	prot["get_ProtectionLocked"] = prot["asc_getProtectionLocked"] = prot.asc_getProtectionLocked;
+	prot["put_ProtectionLocked"] = prot["asc_putProtectionLocked"] = prot.asc_putProtectionLocked;
+	prot["get_ProtectionPrint"] = prot["asc_getProtectionPrint"] = prot.asc_getProtectionPrint;
+	prot["put_ProtectionPrint"] = prot["asc_putProtectionPrint"] = prot.asc_putProtectionPrint;
+
 
 	window["Asc"]["asc_TextArtProperties"] = window["Asc"].asc_TextArtProperties = asc_TextArtProperties;
 	prot = asc_TextArtProperties.prototype;
@@ -6234,6 +6296,12 @@
 
 	prot["put_Anchor"] = prot.put_Anchor = prot["asc_putAnchor"] = prot.asc_putAnchor;
 	prot["get_Anchor"] = prot.get_Anchor = prot["asc_getAnchor"] = prot.asc_getAnchor;
+	prot["get_ProtectionLockText"] = prot["asc_getProtectionLockText"] = prot.asc_getProtectionLockText;
+	prot["put_ProtectionLockText"] = prot["asc_putProtectionLockText"] = prot.asc_putProtectionLockText;
+	prot["get_ProtectionLocked"] = prot["asc_getProtectionLocked"] = prot.asc_getProtectionLocked;
+	prot["put_ProtectionLocked"] = prot["asc_putProtectionLocked"] = prot.asc_putProtectionLocked;
+	prot["get_ProtectionPrint"] = prot["asc_getProtectionPrint"] = prot.asc_getProtectionPrint;
+	prot["put_ProtectionPrint"] = prot["asc_putProtectionPrint"] = prot.asc_putProtectionPrint;
 
 
 

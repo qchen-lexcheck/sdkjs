@@ -36,8 +36,6 @@
 
 // Import
 var FontStyle = AscFonts.FontStyle;
-var DecodeBase64Char = AscFonts.DecodeBase64Char;
-var b64_decode = AscFonts.b64_decode;
 
 var g_map_font_index = {};
 var g_fonts_streams = [];
@@ -1381,7 +1379,11 @@ function CFont(name, id, type, thumbnail, style)
         this.NeedStyles = fontstyle_mask_regular | fontstyle_mask_italic | fontstyle_mask_bold | fontstyle_mask_bolditalic;
 }
 CFont.prototype.asc_getFontId = function() { return this.id; };
-CFont.prototype.asc_getFontName = function() { return this.name; };
+CFont.prototype.asc_getFontName = function()
+{
+    var _name = AscFonts.g_fontApplication ? AscFonts.g_fontApplication.NameToInterface[this.name] : null;
+    return _name ? _name : this.name;
+};
 CFont.prototype.asc_getFontThumbnail = function() { return this.thumbnail; };
 CFont.prototype.asc_getFontType = function() { return this.type; };
 
@@ -1396,77 +1398,6 @@ function CImage(src)
     this.src    = src;
     this.Image  = null;
     this.Status = ImageLoadStatus.Complete;
-}
-
-function DecodeBase64(imData, szSrc)
-{
-    var srcLen = szSrc.length;
-    var nWritten = 0;
-
-    var dstPx = imData.data;
-    var index = 0;
-
-    if (window.chrome)
-    {
-        while (index < srcLen)
-        {
-            var dwCurr = 0;
-            var i;
-            var nBits = 0;
-            for (i=0; i<4; i++)
-            {
-                if (index >= srcLen)
-                    break;
-                var nCh = DecodeBase64Char(szSrc.charCodeAt(index++));
-                if (nCh == -1)
-                {
-                    i--;
-                    continue;
-                }
-                dwCurr <<= 6;
-                dwCurr |= nCh;
-                nBits += 6;
-            }
-
-            dwCurr <<= 24-nBits;
-            for (i=0; i<nBits/8; i++)
-            {
-                dstPx[nWritten++] = ((dwCurr & 0x00ff0000) >>> 16);
-                dwCurr <<= 8;
-            }
-        }
-    }
-    else
-    {
-        var p = b64_decode;
-        while (index < srcLen)
-        {
-            var dwCurr = 0;
-            var i;
-            var nBits = 0;
-            for (i=0; i<4; i++)
-            {
-                if (index >= srcLen)
-                    break;
-                var nCh = p[szSrc.charCodeAt(index++)];
-                if (nCh == undefined)
-                {
-                    i--;
-                    continue;
-                }
-                dwCurr <<= 6;
-                dwCurr |= nCh;
-                nBits += 6;
-            }
-
-            dwCurr <<= 24-nBits;
-            for (i=0; i<nBits/8; i++)
-            {
-                dstPx[nWritten++] = ((dwCurr & 0x00ff0000) >>> 16);
-                dwCurr <<= 8;
-            }
-        }
-    }
 }
 
 	var g_font_files, g_font_infos;
@@ -1545,7 +1476,6 @@ function DecodeBase64(imData, szSrc)
     prot['asc_getFontType'] = prot.asc_getFontType;
     window['AscFonts'].ImageLoadStatus = ImageLoadStatus;
     window['AscFonts'].CImage = CImage;
-    window['AscFonts'].DecodeBase64 = DecodeBase64;
 
 })(window, window.document);
 

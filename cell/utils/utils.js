@@ -288,26 +288,30 @@
 			return cellValue;
 		}
 
-		function getFindRegExp(value, options) {
+		function getFindRegExp(value, options, checkEmptyVal) {
 			var findFlags = "g"; // Заменяем все вхождения
 			// Не чувствителен к регистру
 			if (true !== options.isMatchCase) {
 				findFlags += "i";
 			}
-			value = value
-				.replace(/(\\)/g, "\\\\").replace(/(\^)/g, "\\^")
-				.replace(/(\()/g, "\\(").replace(/(\))/g, "\\)")
-				.replace(/(\+)/g, "\\+").replace(/(\[)/g, "\\[")
-				.replace(/(\])/g, "\\]").replace(/(\{)/g, "\\{")
-				.replace(/(\})/g, "\\}").replace(/(\$)/g, "\\$")
-				.replace(/(\.)/g, "\\.")
-				.replace(/(~)?\*/g, function ($0, $1) {
-					return $1 ? $0 : '(.*)';
-				})
-				.replace(/(~)?\?/g, function ($0, $1) {
-					return $1 ? $0 : '.';
-				})
-				.replace(/(~\*)/g, "\\*").replace(/(~\?)/g, "\\?");
+			if (value === "" && checkEmptyVal) {
+				value = /^$/;
+			} else {
+				value = value
+					.replace(/(\\)/g, "\\\\").replace(/(\^)/g, "\\^")
+					.replace(/(\()/g, "\\(").replace(/(\))/g, "\\)")
+					.replace(/(\+)/g, "\\+").replace(/(\[)/g, "\\[")
+					.replace(/(\])/g, "\\]").replace(/(\{)/g, "\\{")
+					.replace(/(\})/g, "\\}").replace(/(\$)/g, "\\$")
+					.replace(/(\.)/g, "\\.")
+					.replace(/(~)?\*/g, function ($0, $1) {
+						return $1 ? $0 : '(.*)';
+					})
+					.replace(/(~)?\?/g, function ($0, $1) {
+						return $1 ? $0 : '.';
+					})
+					.replace(/(~\*)/g, "\\*").replace(/(~\?)/g, "\\?");
+			}
 
 			if (options.isWholeWord)
 				value = '\\b' + value + '\\b';
@@ -1413,6 +1417,22 @@
 			this.worksheet.selectionRange = this.clone();
 			this.worksheet.workbook.handlers.trigger('updateSelection');
 		};
+		SelectionRange.prototype.isContainsOnlyFullRowOrCol = function (byCol) {
+			var res = true;
+			for (var i = 0; i < this.ranges.length; ++i) {
+				var range = this.ranges[i];
+				var type = range.getType();
+				if (byCol && c_oAscSelectionType.RangeCol !== type) {
+					res = false;
+					break;
+				}
+				if (!byCol && c_oAscSelectionType.RangeRow !== type) {
+					res = false;
+					break;
+				}
+			}
+			return res;
+		};
 
     /**
      *
@@ -2158,16 +2178,21 @@
 				ctx.setFillStyle(solid).fillRect(rect._x, rect._y, rect._width, rect._height);
 				return;
 			}
-			var dScale = Asc.getCvtRatio(0, 3, ctx.getPPIX());
-			rect._x *= dScale;
-			rect._y *= dScale;
-			rect._width *= dScale;
-			rect._height *= dScale;
+			
+			var vector_koef = AscCommonExcel.vector_koef / ctx.getZoom();
+			if (AscCommon.AscBrowser.isCustomScaling()) {
+				vector_koef /= AscCommon.AscBrowser.retinaPixelRatio;
+			}
+			rect._x *= vector_koef;
+			rect._y *= vector_koef;
+			rect._width *= vector_koef;
+			rect._height *= vector_koef;
 			AscFormat.ExecuteNoHistory(
 				function () {
 					var geometry = new AscFormat.CreateGeometry("rect");
 					geometry.Recalculate(rect._width, rect._height, true);
 					var oUniFill = AscCommonExcel.convertFillToUnifill(fill);
+
 					if (ctx instanceof AscCommonExcel.CPdfPrinter) {
 						graphics.SaveGrState();
 						var _baseTransform;
@@ -2179,7 +2204,7 @@
 						graphics.SetBaseTransform(_baseTransform);
 					}
 
-					graphics.save();
+					graphics.SaveGrState();
 					var oMatrix = new AscCommon.CMatrix();
 					oMatrix.tx = rect._x;
 					oMatrix.ty = rect._y;
@@ -2189,8 +2214,8 @@
 
 					shapeDrawer.fromShape2(new AscFormat.CColorObj(null, oUniFill, geometry), graphics, geometry);
 					shapeDrawer.draw(geometry);
-					graphics.restore();
-
+					graphics.RestoreGrState();
+					
 					if (ctx instanceof AscCommonExcel.CPdfPrinter) {
 						graphics.SetBaseTransform(null);
 						graphics.RestoreGrState();
@@ -2202,10 +2227,8 @@
 		function generateSlicerStyles(w, h, wb) {
 			var result = [];
 
-			if (AscCommon.AscBrowser.isRetina) {
-				w = AscCommon.AscBrowser.convertToRetinaValue(w, true);
-				h = AscCommon.AscBrowser.convertToRetinaValue(h, true);
-			}
+			w = AscCommon.AscBrowser.convertToRetinaValue(w, true);
+			h = AscCommon.AscBrowser.convertToRetinaValue(h, true);
 
 			var ctx = getContext(w, h, wb);
 			var oCanvas = ctx.getCanvas();
@@ -2236,14 +2259,10 @@
 
 			var dxf, dxfWhole;
 
-			var nIns = 2;
-			var nBH = 8;
+			var nBH = (height / 6)  >> 0;
 
-			if (AscCommon.AscBrowser.isRetina) {
-				nIns = AscCommon.AscBrowser.convertToRetinaValue(nIns, true);
-				nBH = AscCommon.AscBrowser.convertToRetinaValue(nBH, true);
-			}
-
+			var nIns = (height / 6 / 5) >> 0;
+			var nHIns = (height / 6 / 5 + 0.5) >> 0;
 			//whole
 			dxfWhole = oTableStyle.wholeTable && oTableStyle.wholeTable.dxf;
 			drawSlicerPreviewElement(dxfWhole, null, ctx, graphics, 0, 0, width, height);
@@ -2262,8 +2281,8 @@
 			];
 			for(var nType = 0; nType < aBT.length; ++nType) {
 				dxf = oSlicerStyle[aBT[nType]];
-				drawSlicerPreviewElement(dxf, dxfWhole, ctx, graphics, nIns, nPos, width - nIns, nPos + nBH);
-				nPos += nBH + nIns;
+				drawSlicerPreviewElement(dxf, dxfWhole, ctx, graphics, nHIns, nPos, width - nHIns, nPos + nBH);
+				nPos += (nBH + nIns);
 			}
 		}
 		function drawSlicerPreviewElement(dxf, dxfWhole, ctx, graphics, x0, y0, x1, y1) {
@@ -2301,10 +2320,9 @@
 			if (dxfWhole) {
 				var nTIns = 5;
 				var nTW = 8;
-				if (AscCommon.AscBrowser.isRetina) {
-					nTIns = AscCommon.AscBrowser.convertToRetinaValue(nTIns, true);
-					nTW = AscCommon.AscBrowser.convertToRetinaValue(nTW, true);
-				}
+
+				nTIns = AscCommon.AscBrowser.convertToRetinaValue(nTIns, true);
+				nTW = AscCommon.AscBrowser.convertToRetinaValue(nTW, true);
 
 				var oFont = dxf && dxf.getFont() || dxfWhole && dxfWhole.getFont && dxfWhole.getFont();
 				var oColor = oFont ? oFont.getColor() : new AscCommon.CColor(0, 0, 0);
@@ -2312,7 +2330,7 @@
 				ctx.setLineWidth(1);
 				ctx.setLineDash([]);
 				ctx.beginPath();
-				ctx.lineHor(nTIns, y0 + (y1 - y0) / 2.0, nTIns + nTW);
+				ctx.lineHor(nTIns, (y0 + (y1 - y0) / 2.0 + 0.5) >> 0, nTIns + nTW);
 				ctx.stroke();
 			}
 		}
@@ -2507,6 +2525,8 @@
 				
 				//Tooltip
 				this.tooltip = obj.tooltip;
+
+				this.color = obj.color;
 			}
 
 			return this;
@@ -2524,7 +2544,8 @@
 			asc_getSizeCCOrPt: function () { return this.sizeCCOrPt; },
 			asc_getSizePx: function () { return this.sizePx; },
 			asc_getFilter: function () { return this.filter; },
-			asc_getTooltip: function () { return this.tooltip; }
+			asc_getTooltip: function () { return this.tooltip; },
+			asc_getColor: function () { return this.color; }
 		};
 
 		// Гиперссылка
@@ -2679,6 +2700,8 @@
 
 			this.showZeros = null;
 
+			this.topLeftCell = null;
+
 			return this;
 		}
 
@@ -2693,6 +2716,7 @@
 					result.pane = this.pane.clone();
 				}
 				result.showZeros = this.showZeros;
+				result.topLeftCell = this.topLeftCell;
 				return result;
 			},
 			isEqual: function (settings) {
@@ -3389,6 +3413,7 @@
 		prot["asc_getSizePx"] = prot.asc_getSizePx;
 		prot["asc_getFilter"] = prot.asc_getFilter;
 		prot["asc_getTooltip"] = prot.asc_getTooltip;
+		prot["asc_getColor"] = prot.asc_getColor;
 
 		window["Asc"]["asc_CHyperlink"] = window["Asc"].asc_CHyperlink = asc_CHyperlink;
 		prot = asc_CHyperlink.prototype;
