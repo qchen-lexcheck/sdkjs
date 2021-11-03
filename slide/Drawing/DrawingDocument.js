@@ -4142,6 +4142,12 @@ function CThumbnailsManager()
 
 	this.onMouseDown = function(e)
 	{
+		// в ios версии >= 14 приходит событие onMouseDown и сбрасывает таймаут для появления меню при тапе у thumbnails (баг #52106)
+		var bskip = AscCommon.AscBrowser.isAppleDevices && AscCommon.AscBrowser.iosVersion >= 14 && e.target.id == "id_thumbnails";
+		if (bskip && e.type == "mousedown") {
+			AscCommon.stopEvent(e);
+			return;
+		}
 		if (oThis.m_oWordControl)
 		{
 			oThis.m_oWordControl.m_oApi.checkInterfaceElementBlur();
