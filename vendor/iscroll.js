@@ -332,6 +332,11 @@ function IScroll (el, options) {
 	if (AscCommon.AscBrowser.isAppleDevices && AscCommon.AscBrowser.iosVersion >= 13)
 		this.options.click = true;
 
+	// добавил этот флаг чтобы здесь обрабатывать и останавливать событие onMouseDown
+	// а иначе оно срабатывает в DrawingDocument.js CThumbnailsManager.onMouseDown и получается баг #52106 (так как оно сбрасывает таймаут на появление меню)
+	if (AscCommon.AscBrowser.isAppleDevices && AscCommon.AscBrowser.iosVersion >= 14)
+		this.options.mousedown = true;
+
 	// Normalize options
 	this.translateZ = this.options.HWCompositing && utils.hasPerspective ? ' translateZ(0)' : '';
 
@@ -985,6 +990,11 @@ IScroll.prototype = {
 
 		if ( this.options.click ) {
 			eventType(_wrapper, 'click', this, true);
+		}
+
+		// возможно не только c thumbnails надо так делать, но пока проблема только с ними
+		if ( this.options.mousedown && this.eventsElement.id == 'id_thumbnails' ) {
+			eventType(_wrapper, 'mousedown', this, true);
 		}
 
 		if ( !this.options.disableMouse ) {
@@ -1664,6 +1674,10 @@ IScroll.prototype = {
 			case 'pointerdown':
 			case 'MSPointerDown':
 			case 'mousedown':
+				if ( e.type == 'mousedown' ) {
+					AscCommon.stopEvent(e);
+					break;
+				}
 				this.isDown = true;
 				this.isDownBeforeClick = true;
 				this.eventsElement ? this.manager.mainOnTouchStart(e) : this._start(e);
