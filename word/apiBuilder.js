@@ -4244,7 +4244,6 @@
 		var oSectPr = new CSectionPr(this.Document);
 
 		var nContentPos = this.Document.CurPos.ContentPos;
-		var oElement    = this.Document.Content[nContentPos];
 		var oCurSectPr  = this.Document.SectionsInfo.Get_SectPr(nContentPos).SectPr;
 
 		this.Document.History.MinorChanges = true;
