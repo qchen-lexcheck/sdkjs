@@ -4242,6 +4242,20 @@
 			return null;
 
 		var oSectPr = new CSectionPr(this.Document);
+
+		var nContentPos = this.Document.CurPos.ContentPos;
+		var oElement    = this.Document.Content[nContentPos];
+		var oCurSectPr  = this.Document.SectionsInfo.Get_SectPr(nContentPos).SectPr;
+
+		this.Document.History.MinorChanges = true;
+
+		oSectPr.Copy(oCurSectPr);
+		oCurSectPr.Set_Type(oSectPr.Type);
+		oCurSectPr.Set_PageNum_Start(-1);
+		oCurSectPr.Clear_AllHdrFtr();
+
+		this.Document.History.MinorChanges = false;
+
 		oParagraph.private_GetImpl().Set_SectionPr(oSectPr);
 		return new ApiSection(oSectPr);
 	};
