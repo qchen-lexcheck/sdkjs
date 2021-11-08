@@ -1674,7 +1674,7 @@ IScroll.prototype = {
 			case 'pointerdown':
 			case 'MSPointerDown':
 			case 'mousedown':
-				if ( e.type == 'mousedown' ) {
+				if ( e.type == 'mousedown' && e.target.id == "id_thumbnails" ) {
 					AscCommon.stopEvent(e);
 					break;
 				}
