@@ -947,6 +947,23 @@
     };
 
     /**
+	 * Specify the languages which will be used to check spelling and grammar (if requested).
+	 * @memberof ApiPresentation
+	 * @typeofeditors ["CDE"]
+	 * @param {string} sLangId - The possible value for this parameter is a language identifier as defined by
+	 * RFC 4646/BCP 47. Example: "en-CA".
+     * @returns {bool}
+	 */
+    ApiPresentation.prototype.SetLanguage = function(sLangId)
+    {
+        var nLcid = Asc.g_oLcidNameToIdMap[sLangId];
+        if (nLcid === undefined)
+            return false;
+
+        this.Presentation.SetLanguage(nLcid);
+        return true;
+    };
+    /**
      * Gets slides count.
      * @typeofeditors ["CPE"]
      * @returns {number}
@@ -2250,6 +2267,7 @@
             bg.bgPr      = new AscFormat.CBgPr();
             bg.bgPr.Fill = oApiFill.UniFill;
             this.Slide.changeBackground(bg);
+            this.Slide.recalculateBackground();
         }
     };
 
@@ -2434,6 +2452,7 @@
         bg.bgPr       = new AscFormat.CBgPr();
         bg.bgPr.Fill  = apiNoFill.UniFill;
         this.Slide.changeBackground(bg);
+        this.Slide.recalculateBackground();
 
         return true;
     };
@@ -2452,6 +2471,7 @@
         if (Layout && Layout.cSld.Bg)
         {
             this.Slide.changeBackground(Layout.cSld.Bg);
+            this.Slide.recalculateBackground();
             return true;
         }
         else 
@@ -3903,6 +3923,7 @@
     ApiPresentation.prototype["ApplyTheme"]               = ApiPresentation.prototype.ApplyTheme;
     ApiPresentation.prototype["GetDefaultTextPr"]         = ApiPresentation.prototype.GetDefaultTextPr;
     ApiPresentation.prototype["RemoveSlides"]             = ApiPresentation.prototype.RemoveSlides;
+    ApiPresentation.prototype["SetLanguage"]           = ApiPresentation.prototype.SetLanguage;
 
     ApiMaster.prototype["GetClassType"]                   = ApiMaster.prototype.GetClassType;
     ApiMaster.prototype["GetLayout"]                      = ApiMaster.prototype.GetLayout;
