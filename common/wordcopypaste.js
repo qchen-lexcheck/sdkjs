@@ -3968,7 +3968,32 @@ PasteProcessor.prototype =
 		if (null === aContent) {
 			return null;
 		}
+		var oSelected = this.oLogicDocument.GetSelectedContent();
 
+		if (aContent && aContent.content &&
+			aContent.content[0].IsTable() && oSelected && oSelected.Elements &&
+			oSelected.Elements.length === 1 &&
+			oSelected.Elements[0].Element &&
+			oSelected.Elements[0].Element.IsTable())
+		{
+			var pastForTable = oSelected.Elements[0].Element;
+			var pastedElement = aContent.content[0];
+			var flagForRows = 0, flagForColumns = 0;
+			for (var Index = 0, nRowsCount = pastForTable.GetRowsCount(); Index < nRowsCount; Index++)
+			{
+				for (var nCells = 0; nCells < pastForTable.Content[Index].Content.length; nCells++)
+				{
+					pastForTable.Content[Index].Content[nCells].Content = pastedElement.Content[flagForRows].Content[flagForColumns].Content.Copy(pastForTable.Content[Index].Content[nCells].Content.Parent,
+						pastForTable.Content[Index].Content[nCells].Content.DrawingDocument, pastForTable.Content[Index].Content[nCells].Content.Content[0].Pr);
+					flagForColumns++;
+					flagForColumns = flagForColumns === pastedElement.Content[flagForRows].Content.length ? 0 :flagForColumns;
+				}
+				flagForColumns = 0;
+				flagForRows++;
+				flagForRows = flagForRows === pastedElement.Content.length ? 0 : flagForRows;
+			}
+			aContent.content[0] = pastForTable;
+		}
 		//вставляем в заголовок диаграммы, предварительно конвертируем все параграфы в презентационный формат
 		if (aContent && aContent.content && this.oDocument.bPresentation && oThis.oDocument && oThis.oDocument.Parent &&
 			oThis.oDocument.Parent.parent && oThis.oDocument.Parent.parent.parent &&
