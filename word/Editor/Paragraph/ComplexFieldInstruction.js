@@ -56,6 +56,7 @@ var fieldtype_FORMULA    = 0x0010;
 var fieldtype_SEQ        = 0x0011;
 var fieldtype_STYLEREF   = 0x0012;
 var fieldtype_NOTEREF    = 0x0013;
+var fieldtype_EQ         = 0x0014;
 
 
 //--------------------------------------------------------export----------------------------------------------------
@@ -79,6 +80,7 @@ window['AscCommonWord'].fieldtype_FORMULA    = fieldtype_FORMULA;
 window['AscCommonWord'].fieldtype_SEQ        = fieldtype_SEQ;
 window['AscCommonWord'].fieldtype_STYLEREF   = fieldtype_STYLEREF;
 window['AscCommonWord'].fieldtype_NOTEREF    = fieldtype_NOTEREF;
+window['AscCommonWord'].fieldtype_EQ         = fieldtype_EQ;
 
 
 /**
