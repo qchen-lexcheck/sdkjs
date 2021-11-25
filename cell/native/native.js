@@ -978,6 +978,12 @@ function asc_menu_ReadShapePr(_params, _cursor){
             case 6:
             {
                 _settings.InsertPageNum = _params[_cursor.pos++];
+                break;
+            }
+            case 7:
+            {
+                _settings.bFromGroup = _params[_cursor.pos++];
+                break;
             }
             case 255:
             default:
@@ -1015,6 +1021,12 @@ function asc_menu_WriteShapePr(_type, _shapePr, _stream){
     {
         _stream["WriteByte"](5);
         _stream["WriteBool"](_shapePr.bFromChart);
+    }
+    //6-InsertPageNum
+    if (_shapePr.bFromGroup !== undefined && _shapePr.bFromGroup !== null)
+    {
+        _stream["WriteByte"](7);
+        _stream["WriteBool"](_shapePr.bFromGroup);
     }
     
     _stream["WriteByte"](255);
@@ -3292,6 +3304,7 @@ function OfflineEditor () {
             	t.asc_WriteAllWorksheets(true);
             	t.asc_WriteCurrentCell();
             
+                _api.asc_CheckGuiControlColors();
             	_api.sendColorThemes(_api.wbModel.theme);
             	_api.asc_ApplyColorScheme(false);
             	_api._applyFirstLoadChanges();
@@ -3506,6 +3519,8 @@ function OfflineEditor () {
                                   stream["WriteString2"](JSON.stringify(options));
                                   window["native"]["OnCallMenuEvent"](22000, stream); // ASC_MENU_EVENT_TYPE_ADVANCED_OPTIONS
                                   });
+                                  
+        _api.asc_registerCallback("asc_onSendThemeColors", onApiSendThemeColors);
 
         // Comments
 
@@ -4456,7 +4471,7 @@ window["native"]["offline_get_selection"] = function(x, y, width, height, autoco
 window["native"]["offline_get_charts_ranges"] = function() {
     var ws = _api.wb.getWorksheet();
     
-    var ranges = _api.wb.getWorksheet().__chartsRanges();
+    var ranges = ws.__chartsRanges();
     var cattbbox = null;
     var serbbox = null;
     
@@ -4465,11 +4480,34 @@ window["native"]["offline_get_charts_ranges"] = function() {
     var selected_objects = controller.selection.groupSelection ? controller.selection.groupSelection.selectedObjects : controller.selectedObjects;
     if (selected_objects.length === 1 && selected_objects[0].getObjectType() === AscDFH.historyitem_type_ChartSpace) {
         chart = selected_objects[0];
-        ranges = ranges ? ranges : _api.wb.getWorksheet().__chartsRanges([chart.bbox.seriesBBox]);
-        cattbbox = chart.bbox.catBBox ? _api.wb.getWorksheet().__chartsRanges([chart.bbox.catBBox]) : null;
-        serbbox = chart.bbox.serBBox ? _api.wb.getWorksheet().__chartsRanges([chart.bbox.serBBox]) : null;
+        var oDataRange = null, oCatRange = null, oSerRange = null;
+        if (ws.isChartAreaEditMode && ws.oOtherRanges) {
+            var aChartRanges = ws.oOtherRanges.ranges;
+            for(var nRange = 0; nRange < aChartRanges.length; ++nRange) {
+                var oChartRange = aChartRanges[nRange];
+                if(oChartRange.chartRangeIndex === 0) {
+                    oDataRange = oChartRange;
+                }
+                else if(oChartRange.chartRangeIndex === 1) {
+                    oSerRange = oChartRange;
+                }
+                else if(oChartRange.chartRangeIndex === 2) {
+                    oCatRange = oChartRange;
+                }
+            }
+            if(oDataRange) {
+                var ranges = ranges ? ranges : ws.__chartsRanges([oDataRange]);
+                var catbbox = null;//oCatRange ? ws.__chartsRanges([oCatRange]) : null;
+                var serbbox = null;//oSerRange ? ws.__chartsRanges([oSerRange]) : null;
+                return {
+                    'ranges': ranges,
+                    'cattbbox': catbbox,
+                    'serbbox': serbbox
+                };
+            }
+        }
+        return {'ranges': null, 'cattbbox': null, 'serbbox': null};
     }
-    
     return {'ranges':ranges, 'cattbbox':cattbbox, 'serbbox':serbbox};
 }
 window["native"]["offline_get_worksheet_bounds"] = function() {return _s.getMaxBounds();}
@@ -4511,6 +4549,18 @@ window["native"]["offline_keyboard_down"] = function(inputKeys) {
                 ws.objectRender.controller.updateSelectionState();
                 ws.objectRender.controller.drawingObjects.sendGraphicObjectProps();
                 
+            } else if (9 === operationCode ) {  // Select cell
+
+                if (37 === codeKey) {       // LEFT
+                    wb._onChangeSelection(false, -1, 0, false);
+                } else if (39 === codeKey) {     // RIGHT
+                    wb._onChangeSelection(false, 1, 0, false);
+                } else if (38 === codeKey) {          // UP
+                    wb._onChangeSelection(false, 0, -1, false);
+                } else if (40 === codeKey) {     // DOWN
+                    wb._onChangeSelection(false, 0, 1, false);
+                }
+
             } else {
                 
                 if (8 === codeKey || 13 === codeKey || 27 == codeKey) {
@@ -4523,19 +4573,19 @@ window["native"]["offline_keyboard_down"] = function(inputKeys) {
                     window.AscDisableTextSelection = true;
                 }
             }
-        }
-        else if (37 === codeKey)      // LEFT
+        } else if (37 === codeKey) {      // LEFT
             wb._onChangeSelection(true, -1, 0, false);
-        else if (39 === codeKey)     // RIGHT
+        } else if (39 === codeKey) {     // RIGHT
             wb._onChangeSelection(true, 1, 0, false);
-        if (38 === codeKey)          // UP
+        } else if (38 === codeKey) {          // UP
             wb._onChangeSelection(true, 0, -1, false);
-        else if (40 === codeKey)     // DOWN
+        } else if (40 === codeKey) {     // DOWN
             wb._onChangeSelection(true, 0, 1, false);
-        else if (9 === codeKey)     // TAB
+        } else if (9 === codeKey) {     // TAB
             wb._onChangeSelection(true, -1, 0, false);
-        else if (13 === codeKey)     // ENTER
+        } else if (13 === codeKey) {     // ENTER
             wb._onChangeSelection(true, 0, 1, false);
+        }
     }
 
     wb.isFormulaEditMode = isFormulaEditMode;
@@ -6414,6 +6464,16 @@ window["native"]["offline_apply_event"] = function(type,params) {
 
 // Common
 
+function getHexColor(r, g, b) {
+    r = r.toString(16);
+    g = g.toString(16);
+    b = b.toString(16);
+    if (r.length == 1) r = '0' + r;
+    if (g.length == 1) g = '0' + g;
+    if (b.length == 1) b = '0' + b;
+    return r + g + b;
+}
+
 function postDataAsJSONString(data, eventId) {
     var stream = global_memory_stream_menu;
     stream["ClearNoAttack"]();
@@ -6613,6 +6673,19 @@ function onDocumentPlaceChanged() {
     postDataAsJSONString(null, 23012); // ASC_MENU_EVENT_TYPE_DOCUMENT_PLACE_CHANGED
 }
 
+function onApiSendThemeColors(theme_colors, standart_colors) {
+    var colors = {
+        "themeColors": theme_colors.map(function(color) {
+            return getHexColor(color.get_r(), color.get_g(), color.get_b());
+        })
+    }
+    if (standart_colors != null) {
+        colors["standartColors"] = standart_colors.map(function(color) {
+            return getHexColor(color.get_r(), color.get_g(), color.get_b());
+        });
+    }
+    postDataAsJSONString(colors, 2417); // ASC_MENU_EVENT_TYPE_THEMECOLORS
+}
 window["Asc"]["spreadsheet_api"].prototype.asc_setDocumentPassword = function(password)
 {
     var v = {
@@ -6697,7 +6770,7 @@ window["AscCommonExcel"].WorksheetView.prototype._drawCollaborativeElementsMeOth
             var lockInfo = this.collaborativeEditing.getLockInfo(AscCommonExcel.c_oAscLockTypeElem.Range,
                                                                  null,
                                                                  sheetId,
-                                                                 new AscCommonExcel.asc_CCollaborativeRange(arrayCells[i].c1, arrayCells[i].c2, arrayCells[i].c2, arrayCells[i].r2));
+                                                                 new AscCommonExcel.asc_CCollaborativeRange(arrayCells[i].c1, arrayCells[i].r1, arrayCells[i].c2, arrayCells[i].r2));
             var isLocked = this.collaborativeEditing.getLockIntersection(lockInfo, AscCommon.c_oAscLockTypes, AscCommon.c_oAscLockTypes.kLockTypeOther, false);
             if (false !== isLocked) {
                 userId = isLocked.UserId;

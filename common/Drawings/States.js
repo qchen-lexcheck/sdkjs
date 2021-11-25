@@ -159,12 +159,12 @@ StartAddNewShape.prototype =
                     return;
                 }
             }
-            var callback = function(bLock){
+            var callback = function(bLock, isClickMouseEvent){
 
                 if(bLock)
                 {
                     History.Create_NewPoint(AscDFH.historydescription_CommonStatesAddNewShape);
-                    var shape = track.getShape(false, oThis.drawingObjects.getDrawingDocument(), oThis.drawingObjects.drawingObjects);
+                    var shape = track.getShape(false, oThis.drawingObjects.getDrawingDocument(), oThis.drawingObjects.drawingObjects, isClickMouseEvent);
 
                     if(!(oThis.drawingObjects.drawingObjects && oThis.drawingObjects.drawingObjects.cSld))
                     {
@@ -206,7 +206,7 @@ StartAddNewShape.prototype =
             }
             else
             {
-                callback(true);
+                callback(true, e.ClickCount);
             }
         }
         this.drawingObjects.clearTrackObjects();
@@ -235,8 +235,13 @@ function checkEmptyPlaceholderContent(content)
         return content;
     }
     if(content.Parent && content.Parent.parent){
-        if(content.Is_Empty() && content.Parent.parent.isPlaceholder && content.Parent.parent.isPlaceholder()){
-            return content;
+        if(content.Is_Empty()){
+            if(content.Parent.parent.isPlaceholder && content.Parent.parent.isPlaceholder()) {
+                return content;
+            }
+            if(content.isDocumentContentInSmartArtShape && content.isDocumentContentInSmartArtShape) {
+                return content;
+            }
         }
         if(content.Parent.parent.txWarpStruct){
             return content;
@@ -369,6 +374,12 @@ NullState.prototype =
                     this.drawingObjects.changeCurrentState(new TrackSelectionRect(this.drawingObjects));
                 }
 
+            }
+            var oAnimPlayer = this.drawingObjects.getAnimationPlayer && this.drawingObjects.getAnimationPlayer();
+            if(oAnimPlayer) {
+                if(oAnimPlayer.onClick()) {
+                    return true;
+                }
             }
         }
         else
@@ -688,7 +699,7 @@ RotateState.prototype =
                     {
                         copy.setParent2(this.drawingObjects.drawingObjects);
                         if(!copy.spPr || !copy.spPr.xfrm
-                            || (copy.getObjectType() === AscDFH.historyitem_type_GroupShape && !copy.spPr.xfrm.isNotNullForGroup() || copy.getObjectType() !== AscDFH.historyitem_type_GroupShape && !copy.spPr.xfrm.isNotNull()))
+                            || ((copy.getObjectType() === AscDFH.historyitem_type_GroupShape || copy.getObjectType() === AscDFH.historyitem_type_SmartArt) && !copy.spPr.xfrm.isNotNullForGroup() || copy.getObjectType() !== AscDFH.historyitem_type_GroupShape && !copy.spPr.xfrm.isNotNull()))
                         {
                             copy.recalculateTransform();
                         }
@@ -2554,6 +2565,7 @@ function TrackTextState(drawingObjects, majorObject, x, y) {
     window['AscFormat'].SlicerState = SlicerState;
     window['AscFormat'].PreChangeAdjState = PreChangeAdjState;
     window['AscFormat'].PreRotateState = PreRotateState;
+    window['AscFormat'].RotateState = RotateState;
     window['AscFormat'].PreResizeState = PreResizeState;
     window['AscFormat'].PreMoveState = PreMoveState;
     window['AscFormat'].MoveState = MoveState;

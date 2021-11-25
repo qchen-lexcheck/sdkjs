@@ -311,7 +311,7 @@ ParaComment.prototype =
     {
     },
 
-    Shift_Range : function(Dx, Dy, _CurLine, _CurRange)
+    Shift_Range : function(Dx, Dy, _CurLine, _CurRange, _CurPage)
     {
     },
 //-----------------------------------------------------------------------------------
@@ -1201,7 +1201,7 @@ CComment.prototype =
         this.Data = Data;
     },
 
-    Remove_Marks: function()
+    RemoveMarks: function()
     {
         var Para_start = g_oTableId.Get_ById(this.m_oStartInfo.ParaId);
         var Para_end   = g_oTableId.Get_ById(this.m_oEndInfo.ParaId);

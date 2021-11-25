@@ -203,11 +203,11 @@ function CBinaryFileWriter()
     };
     this.GetBase64Memory = function()
     {
-        return AscCommon.Base64Encode(this.data,this.pos, 0);
+        return AscCommon.Base64.encode(this.data, 0, this.pos);
     };
     this.GetBase64Memory2 = function(nPos, nLen)
     {
-        return AscCommon.Base64Encode(this.data, nLen, nPos);
+        return AscCommon.Base64.encode(this.data, nPos, nLen);
     };
     this.GetData   = function(nPos, nLen)
     {
@@ -1195,6 +1195,11 @@ function CBinaryFileWriter()
                 this.EndRecord();
             }
         }
+        if (presentation.Api.vbaMacros) {
+            this.StartRecord(8);
+            this.WriteBuffer(presentation.Api.vbaMacros, 0, presentation.Api.vbaMacros.length);
+            this.EndRecord();
+        }
 		var macros = presentation.Api.macros.GetData();
 		if (macros) {
 			this.StartRecord(9);
@@ -1826,6 +1831,11 @@ function CBinaryFileWriter()
                 oThis.WriteGroupShape(oSp);
                 break;
             }
+            case AscDFH.historyitem_type_SmartArt:
+            {
+                oThis.WriteGrFrame(oSp);
+                break;
+            }
             case AscDFH.historyitem_type_GraphicFrame:
             case AscDFH.historyitem_type_ChartSpace:
             case AscDFH.historyitem_type_SlicerView:
@@ -2342,7 +2352,11 @@ function CBinaryFileWriter()
     this.WriteBodyPr = function(bodyPr)
     {
         if (undefined === bodyPr || null == bodyPr)
-            return;
+		{
+			oThis.WriteUChar(g_nodeAttributeStart);
+			oThis.WriteUChar(g_nodeAttributeEnd);
+			return;
+		}
 
         oThis.WriteUChar(g_nodeAttributeStart);
         oThis._WriteInt2(0, bodyPr.flatTx);
@@ -3603,15 +3617,11 @@ function CBinaryFileWriter()
     {
         if(shape.getObjectType() === AscDFH.historyitem_type_Cnx){
             oThis.StartRecord(3);
-            oThis.WriteUChar(g_nodeAttributeStart);
-            oThis._WriteString2(0, shape.macro);
-            oThis.WriteUChar(g_nodeAttributeEnd);
         }
         else{
             oThis.StartRecord(1);
             oThis.WriteUChar(g_nodeAttributeStart);
             oThis._WriteBool2(0, shape.attrUseBgFill);
-            oThis._WriteString2(1, shape.macro);
             oThis.WriteUChar(g_nodeAttributeEnd);
         }
 
@@ -3649,8 +3659,15 @@ function CBinaryFileWriter()
         oThis.WriteRecord1(1, shape.spPr, oThis.WriteSpPr);
         oThis.WriteRecord2(2, shape.style, oThis.WriteShapeStyle);
         oThis.WriteRecord2(3, shape.txBody, oThis.WriteTxBody);
-
+        oThis.WriteRecord2(6, shape.txXfrm, oThis.WriteXfrm);
         oThis.WriteRecord2(7, shape.signatureLine, oThis.WriteSignatureLine);
+        oThis.WriteRecord2(8, shape.modelId, function() {
+            oThis._WriteString1(0, shape.modelId);
+        });
+        oThis.WriteRecord2(9, shape.fLocksText, function() {
+            oThis._WriteBool1(0, shape.fLocksText);
+        });
+        shape.writeMacro(oThis);
 
         if (isUseTmpFill)
         {
@@ -3668,9 +3685,6 @@ function CBinaryFileWriter()
         if(isOle){
             oThis.StartRecord(6);
             //важно писать в начале
-            oThis.WriteUChar(g_nodeAttributeStart);
-            oThis._WriteString2(0, image.macro);
-            oThis.WriteUChar(g_nodeAttributeEnd);
             oThis.WriteRecord1(4, image, oThis.WriteOleInfo);
         } else {
             var _type;
@@ -3685,9 +3699,6 @@ function CBinaryFileWriter()
                 _type = 2;
             }
             oThis.StartRecord(_type);
-            oThis.WriteUChar(g_nodeAttributeStart);
-            oThis._WriteString2(0, image.macro);
-            oThis.WriteUChar(g_nodeAttributeEnd);
             if(bMedia){
                 oThis.WriteRecord1(5, null, function(){
                     oThis.WriteUChar(g_nodeAttributeStart);
@@ -3731,7 +3742,7 @@ function CBinaryFileWriter()
             image.spPr.geometry = null;
         }
         oThis.WriteRecord2(3, image.style, oThis.WriteShapeStyle);
-
+        image.writeMacro(oThis);
         image.spPr.WriteXfrm = null;
 
         oThis.EndRecord();
@@ -3763,7 +3774,6 @@ function CBinaryFileWriter()
     {
         oThis.StartRecord(5);
         oThis.WriteUChar(g_nodeAttributeStart);
-        oThis._WriteString2(1, grObj.macro);
         oThis.WriteUChar(g_nodeAttributeEnd);
         var nvGraphicFramePr;
         if(grObj.nvGraphicFramePr)
@@ -3803,7 +3813,14 @@ function CBinaryFileWriter()
                 });
                 break;
             }
+            case AscDFH.historyitem_type_SmartArt:
+            {
+                oThis.WriteRecord2(8, grObj, function() {
+                    grObj.toPPTY(oThis);
+                })
+            }
         }
+        grObj.writeMacro(oThis);
         oThis.EndRecord();
     };
 
@@ -4267,7 +4284,7 @@ function CBinaryFileWriter()
 
         oThis.WriteRecord2(1, spPr.geometry, oThis.WriteGeometry);
 
-        if (spPr.geometry === undefined || spPr.geometry == null)
+        if ((spPr.geometry === undefined || spPr.geometry == null) && !(spPr.parent instanceof AscFormat.Point))
         {
             if (bIsExistFill || bIsExistLn)
             {
@@ -4554,6 +4571,7 @@ function CBinaryFileWriter()
                 case AscDFH.historyitem_type_GraphicFrame:
                 case AscDFH.historyitem_type_ChartSpace:
                 case AscDFH.historyitem_type_SlicerView:
+                case AscDFH.historyitem_type_SmartArt:
                 {
                     oThis.WriteRecord1(1, nv.locks, oThis.WriteGrFrameCNvPr);
                     break;
@@ -4579,6 +4597,7 @@ function CBinaryFileWriter()
 		oThis._WriteBool1(2, cNvPr.isHidden);
 		oThis._WriteString2(3, cNvPr.title);
 		oThis._WriteString2(4, cNvPr.descr);
+		oThis._WriteBool2(5, cNvPr.form);
         oThis.WriteUChar(g_nodeAttributeEnd);
         oThis.WriteRecord2(0, cNvPr.hlinkClick, oThis.Write_Hyperlink2);
         oThis.WriteRecord2(1, cNvPr.hlinkHover, oThis.Write_Hyperlink2);
@@ -5566,6 +5585,7 @@ function CBinaryFileWriter()
                 }
                 case AscDFH.historyitem_type_ChartSpace:
                 case AscDFH.historyitem_type_SlicerView:
+                case AscDFH.historyitem_type_SmartArt:
                 {
                     this.BinaryFileWriter.WriteGrFrame(grObject);
                     break;
@@ -5583,15 +5603,11 @@ function CBinaryFileWriter()
 
             if(shape.getObjectType() === AscDFH.historyitem_type_Cnx){
                 _writer.StartRecord(3);
-                _writer.WriteUChar(g_nodeAttributeStart);
-                _writer._WriteString2(0, shape.macro);
-                _writer.WriteUChar(g_nodeAttributeEnd);
             }
             else{
                 _writer.StartRecord(1);
                 _writer.WriteUChar(g_nodeAttributeStart);
                 _writer._WriteBool2(0, shape.attrUseBgFill);
-                _writer._WriteString2(1, shape.macro);
                 _writer.WriteUChar(g_nodeAttributeEnd);
             }
 
@@ -5641,7 +5657,10 @@ function CBinaryFileWriter()
                 _writer.EndRecord();
             }
             _writer.WriteRecord2(7, shape.signatureLine, _writer.WriteSignatureLine);
-
+            _writer.WriteRecord2(8, shape.modelId, function() {
+                _writer._WriteString1(0, shape.modelId);
+            });
+            shape.writeMacro(_writer);
             if (isUseTmpFill)
             {
                 shape.spPr.Fill = tmpFill;
@@ -5665,11 +5684,6 @@ function CBinaryFileWriter()
             if(isOle){
                 _writer.StartRecord(6);
                 //важно писать в начале
-
-                _writer.WriteUChar(g_nodeAttributeStart);
-                _writer._WriteString2(0, image.macro);
-                _writer.WriteUChar(g_nodeAttributeEnd);
-
                 _writer.WriteRecord1(4, image, _writer.WriteOleInfo);
             } else {
                 var _type;
@@ -5684,9 +5698,6 @@ function CBinaryFileWriter()
                     _type = 2;
                 }
                 _writer.StartRecord(_type);
-                _writer.WriteUChar(g_nodeAttributeStart);
-                _writer._WriteString2(0, image.macro);
-                _writer.WriteUChar(g_nodeAttributeEnd);
                 if(bMedia){
                     _writer.WriteRecord1(5, null, function(){
                         _writer.WriteUChar(g_nodeAttributeStart);
@@ -5714,7 +5725,7 @@ function CBinaryFileWriter()
             _writer.WriteRecord1(1, _unifill, _writer.WriteUniFill);
             _writer.WriteRecord1(2, image.spPr, _writer.WriteSpPr);
             _writer.WriteRecord2(3, image.style, _writer.WriteShapeStyle);
-
+            image.writeMacro(_writer);
             delete image.spPr.WriteXfrm;
 
             _writer.EndRecord();

@@ -141,9 +141,7 @@
                 zoom = window.Asc.editor.asc_getZoom();
             }
             vector_koef = 25.4 / (ppiX * zoom);
-            if (AscCommon.AscBrowser.isRetina) {
-                vector_koef /= AscCommon.AscBrowser.retinaPixelRatio;
-            }
+            vector_koef /= AscCommon.AscBrowser.retinaPixelRatio;
         }
         return vector_koef;
     }
@@ -1566,6 +1564,9 @@
     CHeader.prototype.checkTextWarp = function(oContent, oBodyPr, dWidth, dHeight, bNeedNoTransform, bNeedWarp) {
         return oDefaultWrapObject;
     };
+    CHeader.prototype.isForm = function() {
+        return false;
+    };
 
     function CButtonBase(parent) {
         AscFormat.CShape.call(this);
@@ -1896,6 +1897,9 @@
             return null;
         }
         return this.getString();
+    };
+    CButton.prototype.isForm = function() {
+        return false;
     };
 
     function CInterfaceButton(parent) {

@@ -231,14 +231,23 @@ function CGroupShape()
         this.group = group;
     };
 
-    CGroupShape.prototype.removeFromSpTree = function(id)
-    {
+    CGroupShape.prototype.getPosInSpTree = function(id) {
         for(var i = this.spTree.length-1; i > -1 ; --i)
         {
             if(this.spTree[i].Get_Id() === id)
             {
-                return this.removeFromSpTreeByPos(i);
+                return i;
             }
+        }
+        return null;
+    };
+
+    CGroupShape.prototype.removeFromSpTree = function(id)
+    {
+        var nPos = this.getPosInSpTree(id);
+        if(nPos !== null)
+        {
+            return this.removeFromSpTreeByPos(nPos);
         }
         return null;
     };
@@ -287,7 +296,7 @@ function CGroupShape()
         for(var i = 0; i < this.spTree.length; ++i)
         {
             var _copy;
-            if(this.spTree[i].getObjectType() === AscDFH.historyitem_type_GroupShape) {
+            if(this.spTree[i].isGroupObject()) {
                 _copy = this.spTree[i].copy(oPr);
             }
             else{
@@ -311,6 +320,12 @@ function CGroupShape()
         }
         if(this.textLink !== null) {
             copy.setTextLink(this.textLink);
+        }
+        if(this.clientData) {
+            copy.setClientData(this.clientData.createDuplicate());
+        }
+        if(this.fLocksText !== null) {
+            copy.setFLocksText(this.fLocksText);
         }
         copy.cachedImage = this.getBase64Img();
         copy.cachedPixH = this.cachedPixH;
@@ -453,6 +468,10 @@ function CGroupShape()
     CGroupShape.prototype.draw = function(graphics)
     {
         if(this.checkNeedRecalculate && this.checkNeedRecalculate()){
+            return;
+        }
+        if(graphics.animationDrawer) {
+            graphics.animationDrawer.drawObject(this, graphics);
             return;
         }
         var oClipRect;
@@ -813,7 +832,7 @@ function CGroupShape()
             }
             else if(this.selectedObjects.length === 1
                 && this.selectedObjects[0].getObjectType() === AscDFH.historyitem_type_Shape
-                &&  !AscFormat.CheckLinePreset(this.selectedObjects[0].getPresetGeom()))
+                && this.selectedObjects[0].canEditText())
             {
                 this.selection.textSelection = this.selectedObjects[0];
                 this.selection.textSelection.paragraphAdd(paraItem, bRecalculate);
@@ -1116,7 +1135,7 @@ function CGroupShape()
             {
                 this.updateCoordinatesAfterInternalResize();
             }
-            if(this.parent instanceof ParaDrawing)
+            if(this.parent instanceof AscCommonWord.ParaDrawing)
             {
                 this.parent.CheckWH();
             }
@@ -1528,7 +1547,7 @@ function CGroupShape()
             xfrm  = sp.spPr.xfrm;
             rot = xfrm.rot == null ? 0 : xfrm.rot;
 
-            if(AscFormat.checkNormalRotate(rot))
+            if(AscFormat.checkNormalRotate(rot)) //  || (this.getName && this.getName() === 'Drawing')
             {
                 cur_min_x = xfrm.offX;
                 cur_min_y = xfrm.offY;
@@ -1712,7 +1731,7 @@ function CGroupShape()
         var arrDrawings = [];
         for(i = this.spTree.length - 1;  i > -1; --i)
         {
-            if(this.spTree[i].getObjectType() === AscDFH.historyitem_type_GroupShape)
+            if(this.spTree[i].isGroupObject())
             {
                 this.spTree[i].bringToFront();
             }
@@ -1732,7 +1751,7 @@ function CGroupShape()
         var i;
         for(i = this.spTree.length-1; i > -1; --i)
         {
-            if(this.spTree[i].getObjectType() === AscDFH.historyitem_type_GroupShape)
+            if(this.spTree[i].isGroupObject())
             {
                 this.spTree[i].bringForward();
             }
@@ -1749,7 +1768,7 @@ function CGroupShape()
         var i, arrDrawings = [];
         for(i = this.spTree.length-1; i > -1; --i)
         {
-            if(this.spTree[i].getObjectType() === AscDFH.historyitem_type_GroupShape)
+            if(this.spTree[i].isGroupObject())
             {
                 this.spTree[i].sendToBack();
             }
@@ -1770,7 +1789,7 @@ function CGroupShape()
         var i;
         for(i = 0; i < this.spTree.length; ++i)
         {
-            if(this.spTree[i].getObjectType() === AscDFH.historyitem_type_GroupShape)
+            if(this.spTree[i].isGroupObject())
             {
                 this.spTree[i].bringBackward();
             }
@@ -1854,7 +1873,6 @@ function CGroupShape()
         }
     };
 
-
     CGroupShape.prototype.getCopyWithSourceFormatting = function(oIdMap){
         var oPr = new AscFormat.CCopyObjectProperties();
         oPr.idMap = oIdMap;
@@ -1880,6 +1898,13 @@ function CGroupShape()
     {
         for(var i = 0; i < this.spTree.length; ++i){
             this.spTree[i].GetAllSeqFieldsByType(sType, aFields)
+        }
+    };
+    CGroupShape.prototype.createPlaceholderControl = function(aControls)
+    {
+        for(var i = 0; i < this.spTree.length; ++i)
+        {
+            this.spTree[i].createPlaceholderControl(aControls);
         }
     };
     CGroupShape.prototype.onSlicerUpdate = function(sName)
@@ -1929,6 +1954,13 @@ function CGroupShape()
         fCallback(this);
         for(var nSp = 0; nSp < this.spTree.length; ++nSp) {
             this.spTree[nSp].handleObject(fCallback);
+        }
+    };
+
+    //for bug 52775. remove in the next version
+    CGroupShape.prototype.applySmartArtTextStyle = function() {
+        for(var nSp = 0; nSp < this.spTree.length; ++nSp) {
+            this.spTree[nSp].applySmartArtTextStyle();
         }
     };
 

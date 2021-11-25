@@ -99,9 +99,9 @@
         setCommentPermissions: function(groups) {
             if (groups && typeof groups == 'object') {
                 commentGroups = {
-                    view: (typeof groups.view == 'object' && groups.view.length>=0) ? groups.view : null,
-                    edit: (typeof groups.edit == 'object' && groups.edit.length>=0) ? groups.edit : null,
-                    remove: (typeof groups.remove == 'object' && groups.remove.length>=0) ? groups.remove : null
+                    view: (typeof groups["view"] == 'object' && groups["view"].length>=0) ? groups["view"] : null,
+                    edit: (typeof groups["edit"] == 'object' && groups["edit"].length>=0) ? groups["edit"] : null,
+                    remove: (typeof groups["remove"] == 'object' && groups["remove"].length>=0) ? groups["remove"] : null
                 };
             }
         },
@@ -136,6 +136,10 @@
             var groups = _getParsedGroups(username);
             groups && (groups.length==0) && (groups = [""]);
             return _intersection(commentGroups.remove, groups);
+        },
+
+        isUserVisible: function(username) {
+            return this.canEditReview(username) || this.canViewComment(username) || this.canEditComment(username) || this.canDeleteComment(username);
         }
     }
 
@@ -152,5 +156,6 @@
     UserInfoParser['canViewComment'] = UserInfoParser.canViewComment;
     UserInfoParser['canEditComment'] = UserInfoParser.canEditComment;
     UserInfoParser['canDeleteComment'] = UserInfoParser.canDeleteComment;
+    UserInfoParser['isUserVisible'] = UserInfoParser.isUserVisible;
 
 })(window);

@@ -784,6 +784,8 @@ CSparklineView.prototype.initFromSparkline = function(oSparkline, oSparklineGrou
             oSerie.spPr.setLn(oLn);
             if(oSparklineGroup.markers && oSparklineGroup.colorMarkers)
             {
+                chart_space.chart.plotArea.charts[0].setMarker(true);
+                chart_space.recalcInfo.recalculateReferences = false;
                 oSerie.marker = CreateSparklineMarker(CreateUniFillFromExcelColor(oSparklineGroup.colorMarkers), bForPreview);
             }
 
@@ -854,8 +856,6 @@ CSparklineView.prototype.initFromSparkline = function(oSparkline, oSparklineGrou
         {
             if(fCallbackSeries)
             {
-
-
                 if(oSparklineGroup.negative && oSparklineGroup.colorNegative)
                 {
                     for(i = 0; i < aSeriesPoints.length; ++i)
@@ -1965,8 +1965,8 @@ GraphicOption.prototype.union = function(oGraphicOption) {
             // Check drawing area
             drawingObject.drawingArea = _this.drawingArea;
             drawingObject.worksheet = currentSheet;
-            drawingObject.graphicObject.drawingBase = aObjects[i];
-            drawingObject.graphicObject.drawingObjects = _this;
+            drawingObject.graphicObject.setDrawingBase(drawingObject);
+            drawingObject.graphicObject.setDrawingObjects(_this);
             drawingObject.graphicObject.getAllRasterImages(aImagesSync);
         }
 
@@ -2182,6 +2182,7 @@ GraphicOption.prototype.union = function(oGraphicOption) {
                 }
         _this.OnUpdateOverlay();
         _this.controller.updateSelectionState(true);
+        AscCommon.CollaborativeEditing.Update_ForeignCursorsPositions();
     };
 
     _this.updateRange = function(oRange) {
@@ -2196,6 +2197,7 @@ GraphicOption.prototype.union = function(oGraphicOption) {
         }
         _this.OnUpdateOverlay();
         _this.controller.updateSelectionState(true);
+        AscCommon.CollaborativeEditing.Update_ForeignCursorsPositions();
     };
 
     _this.print = function(oOptions) {
@@ -3102,7 +3104,8 @@ GraphicOption.prototype.union = function(oGraphicOption) {
 
                 var bCanMove = false;
                 var bCanResize = false;
-                var nDrawingBaseType = obj.graphicObject.getDrawingBaseType();
+                var oGraphicObject = obj.graphicObject;
+                var nDrawingBaseType = oGraphicObject.getDrawingBaseType();
                 switch (nDrawingBaseType)
                 {
                     case AscCommon.c_oAscCellAnchorType.cellanchorTwoCell:
@@ -3360,59 +3363,53 @@ GraphicOption.prototype.union = function(oGraphicOption) {
                 // Normalize position
                 if (metrics)
                 {
-                    if (metrics.from.col < 0)
+                    var oFrom = metrics.from;
+                    var oTo = metrics.to;
+                    if (oFrom.col < 0)
                     {
-                        metrics.from.col = 0;
-                        metrics.from.colOff = 0;
+                        oFrom.col = 0;
+                        oFrom.colOff = 0;
                     }
 
-                    if (metrics.to.col <= 0) {
-                        metrics.to.col = 1;
-                        metrics.to.colOff = 0;
+                    if (oTo.col <= 0) {
+                        oTo.col = 1;
+                        oTo.colOff = 0;
                     }
 
-                    if (metrics.from.row < 0) {
-                        metrics.from.row = 0;
-                        metrics.from.rowOff = 0;
+                    if (oFrom.row < 0) {
+                        oFrom.row = 0;
+                        oFrom.rowOff = 0;
                     }
 
-                    if (metrics.to.row <= 0) {
-                        metrics.to.row = 1;
-                        metrics.to.rowOff = 0;
+                    if (oTo.row <= 0) {
+                        oTo.row = 1;
+                        oTo.rowOff = 0;
                     }
 
-                    if (metrics.from.col == metrics.to.col) {
-                        metrics.to.col++;
-                        metrics.to.colOff = 0;
+                    if (oFrom.col === oTo.col) {
+                        if(oFrom.colOff > oTo.colOff) {
+                            oTo.colOff = oFrom.colOff;
+                        }
                     }
-                    if (metrics.from.row == metrics.to.row) {
-                        metrics.to.row++;
-                        metrics.to.rowOff = 0;
+                    if (oFrom.row === oTo.row) {
+                        if(oFrom.rowOff > oTo.rowOff) {
+                            oTo.rowOff = oFrom.rowOff;
+                        }
                     }
 
-                    /*obj.from.col = metrics.from.col;
-                    obj.from.colOff = metrics.from.colOff;
-                    obj.from.row = metrics.from.row;
-                    obj.from.rowOff = metrics.from.rowOff;
+                    oGraphicObject.setDrawingBaseCoords(oFrom.col, oFrom.colOff, oFrom.row, oFrom.rowOff,
+                        oTo.col, oTo.colOff, oTo.row, oTo.rowOff, obj.Pos.X, obj.Pos.Y, obj.ext.cx, obj.ext.cy);
+                    oGraphicObject.recalculate();
 
-                    obj.to.col = metrics.to.col;
-                    obj.to.colOff = metrics.to.colOff;
-                    obj.to.row = metrics.to.row;
-                    obj.to.rowOff = metrics.to.rowOff;
-                    */
-
-
-                    obj.graphicObject.setDrawingBaseCoords(metrics.from.col, metrics.from.colOff, metrics.from.row, metrics.from.rowOff,
-                        metrics.to.col, metrics.to.colOff, metrics.to.row, metrics.to.rowOff, obj.Pos.X, obj.Pos.Y, obj.ext.cx, obj.ext.cy);
-                    obj.graphicObject.recalculate();
-
-                    if(obj.graphicObject.spPr && obj.graphicObject.spPr.xfrm){
-                        obj.graphicObject.spPr.xfrm.setOffX(obj.graphicObject.x);
-                        obj.graphicObject.spPr.xfrm.setOffY(obj.graphicObject.y);
-                        obj.graphicObject.spPr.xfrm.setExtX(obj.graphicObject.extX);
-                        obj.graphicObject.spPr.xfrm.setExtY(obj.graphicObject.extY);
+                    if(oGraphicObject.spPr && oGraphicObject.spPr.xfrm)
+                    {
+                        var oXfrm = oGraphicObject.spPr.xfrm;
+                        oXfrm.setOffX(oGraphicObject.x);
+                        oXfrm.setOffY(oGraphicObject.y);
+                        oXfrm.setExtX(oGraphicObject.extX);
+                        oXfrm.setExtY(oGraphicObject.extY);
                     }
-                    obj.graphicObject.recalculate();
+                    oGraphicObject.recalculate();
                     bNeedRedraw = true;
                 }
             }
@@ -3841,84 +3838,78 @@ GraphicOption.prototype.union = function(oGraphicOption) {
         }
         else {
             objectProperties.ImageUrl = null;
+            _this.applySliderCallbacks(
+                function(){
+                    _this.controller.setGraphicObjectProps(props);
+                },
+                function() {
+                    _this.controller.setGraphicObjectPropsCallBack(props);
+                    _this.controller.startRecalculate();
+                    _this.sendGraphicObjectProps();
+                }
+            );
+        }
+    };
 
-            if(!api.noCreatePoint || api.exucuteHistory)
-            {
-                if( !api.noCreatePoint && !api.exucuteHistory && api.exucuteHistoryEnd)
-                {
-                    if(_this.nCurPointItemsLength === -1){
-                        _this.controller.setGraphicObjectProps( props );
-                    }
-                    else{
-                        _this.controller.setGraphicObjectPropsCallBack(props);
-                        _this.controller.startRecalculate();
-                        _this.sendGraphicObjectProps();
-                    }
-                    api.exucuteHistoryEnd = false;
+    _this.applySliderCallbacks = function(fStartCallback, fApplyCallback) {
+
+        var Point =  History.Points[History.Index];
+        if(!api.noCreatePoint || api.exucuteHistory) {
+            if( !api.noCreatePoint && !api.exucuteHistory && api.exucuteHistoryEnd) {
+                if(_this.nCurPointItemsLength === -1 && !(Point && Point.Items.length === 0)) {
+                    fStartCallback();
+                }
+                else{
+                    fApplyCallback();
+                }
+                api.exucuteHistoryEnd = false;
+                _this.nCurPointItemsLength = -1;
+            }
+            else {
+                fStartCallback();
+            }
+            if(api.exucuteHistory) {
+                Point =  History.Points[History.Index];
+                if(Point) {
+                    _this.nCurPointItemsLength = Point.Items.length;
+                }
+                else {
                     _this.nCurPointItemsLength = -1;
                 }
-                else
-                {
-                    _this.controller.setGraphicObjectProps( props );
+                api.exucuteHistory = false;
+            }
+            if(api.exucuteHistoryEnd) {
+                api.exucuteHistoryEnd = false;
+            }
+        }
+        else {
+            if(Point && Point.Items.length > 0) {
+                if(this.nCurPointItemsLength > -1) {
+                    var nBottomIndex = - 1;
+                    for ( var Index = Point.Items.length - 1; Index > nBottomIndex; Index-- ) {
+                        var Item = Point.Items[Index];
+                        if(!Item.Class.Read_FromBinary2)
+                            Item.Class.Undo( Item.Type, Item.Data, Item.SheetId );
+                        else
+                            Item.Class.Undo(Item.Data);
+                    }
+                    Point.Items.length = 0;
+                    _this.controller.setSelectionState(Point.SelectionState);
+                    fApplyCallback();
                 }
-                if(api.exucuteHistory)
-                {
-
+                else {
+                    fStartCallback();
                     var Point =  History.Points[History.Index];
-                    if(Point)
-                    {
+                    if(Point) {
                         _this.nCurPointItemsLength = Point.Items.length;
                     }
-                    else
-                    {
+                    else {
                         _this.nCurPointItemsLength = -1;
                     }
-                    api.exucuteHistory = false;
-                }
-                if(api.exucuteHistoryEnd)
-                {
-                    api.exucuteHistoryEnd = false;
                 }
             }
-            else
-            {
-
-                var Point =  History.Points[History.Index];
-                if(Point && Point.Items.length > 0)
-                {
-                    if(this.nCurPointItemsLength > -1){
-                        var nBottomIndex = - 1;
-                        for ( var Index = Point.Items.length - 1; Index > nBottomIndex; Index-- )
-                        {
-                            var Item = Point.Items[Index];
-                            if(!Item.Class.Read_FromBinary2)
-                                Item.Class.Undo( Item.Type, Item.Data, Item.SheetId );
-                            else
-                                Item.Class.Undo(Item.Data);
-                        }
-                        _this.controller.setSelectionState(Point.SelectionState);
-                        Point.Items.length = 0;
-
-                        _this.controller.setGraphicObjectPropsCallBack(props);
-                        _this.controller.startRecalculate();
-                    }
-                    else{
-                        _this.controller.setGraphicObjectProps( props );
-                        var Point =  History.Points[History.Index];
-                        if(Point)
-                        {
-                            _this.nCurPointItemsLength = Point.Items.length;
-                        }
-                        else
-                        {
-                            _this.nCurPointItemsLength = -1;
-                        }
-                    }
-                }
-            }
-            api.exucuteHistoryEnd = false;
         }
-
+        api.exucuteHistoryEnd = false;
     };
 
     _this.showChartSettings = function() {
@@ -3946,8 +3937,15 @@ GraphicOption.prototype.union = function(oGraphicOption) {
         _this.lastX = x;
         _this.lastY = y;
         var offsets = _this.drawingArea.getOffsets(x, y, true);
-        if ( offsets )
-            _this.controller.onMouseMove( e, pxToMm(x - offsets.x), pxToMm(y - offsets.y) );
+        if ( offsets ) {
+
+            var fX = pxToMm(x - offsets.x);
+            var fY = pxToMm(y - offsets.y);
+            _this.controller.onMouseMove( e, fX, fY );
+            if(worksheet && worksheet.model) {
+                AscCommon.CollaborativeEditing.Check_ForeignCursorsLabels(fX, fY, worksheet.model.Id);
+            }
+        }
     };
 
     _this.graphicObjectMouseUp = function(e, x, y) {
@@ -3957,8 +3955,6 @@ GraphicOption.prototype.union = function(oGraphicOption) {
     };
 
     _this.isPointInDrawingObjects3 = function(x, y, page, bSelected, bText) {
-
-
         var offsets = _this.drawingArea.getOffsets(x, y, true);
         if ( offsets )
             return _this.controller.isPointInDrawingObjects3(pxToMm(x - offsets.x), pxToMm(y - offsets.y), page, bSelected, bText );
@@ -4243,7 +4239,12 @@ GraphicOption.prototype.union = function(oGraphicOption) {
     };
 
     _this.Begin_CompositeInput = function(){
-
+        var oWsView = _this.getWorksheet();
+        var oWS = oWsView.model;
+        if(oWS && oWS.getSheetProtection(Asc.c_oAscSheetProtectType.objects)) {
+            oWS.workbook.handlers.trigger("asc_onError", c_oAscError.ID.ChangeOnProtectedSheet, c_oAscError.Level.NoCritical);
+            return false;
+        }
         History.Create_NewPoint(AscDFH.historydescription_Document_CompositeInput);
         _this.beginCompositeInput();
         _this.controller.recalculateCurPos(true, true);
@@ -4404,7 +4405,19 @@ GraphicOption.prototype.union = function(oGraphicOption) {
 		}
 		return coords;
 	};
-
+    DrawingObjects.prototype.getDocumentPositionBinary = function() {
+        if(this.controller) {
+            var oPosition = this.controller.getDocumentPositionForCollaborative();
+            if(!oPosition) {
+                return "";
+            }
+            //console.log("POSITION: " + oPosition.Position);
+            var oWriter = new AscCommon.CMemory(true);
+            oWriter.CheckSize(50);
+            return AscCommon.CollaborativeEditing.GetDocumentPositionBinary(oWriter, oPosition);
+        }
+        return "";
+    };
 function ClickCounter() {
     this.x = 0;
     this.y = 0;

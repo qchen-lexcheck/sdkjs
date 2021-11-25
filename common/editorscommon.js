@@ -155,6 +155,125 @@
 		return false;
 	};
 
+	RegExp.escape = function ( text ) {
+		return text.replace( /[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&" );
+	};
+
+	Math.sinh = function ( arg ) {
+		return (this.pow( this.E, arg ) - this.pow( this.E, -arg )) / 2;
+	};
+
+	Math.cosh = function ( arg ) {
+		return (this.pow( this.E, arg ) + this.pow( this.E, -arg )) / 2;
+	};
+
+	Math.tanh = Math.tanh || function(x) {
+			if (x === Infinity) {
+				return 1;
+			} else if (x === -Infinity) {
+				return -1;
+			} else {
+				var y = Math.exp(2 * x);
+				if (y === Infinity) {
+					return 1;
+				} else if (y === -Infinity) {
+					return -1;
+				}
+				return (y - 1) / (y + 1);
+			}
+		};
+
+	Math.asinh = function ( arg ) {
+		return this.log( arg + this.sqrt( arg * arg + 1 ) );
+	};
+
+	Math.acosh = function ( arg ) {
+		return this.log( arg + this.sqrt( arg + 1 ) * this.sqrt( arg - 1 ) );
+	};
+
+	Math.atanh = function ( arg ) {
+		return 0.5 * this.log( (1 + arg) / (1 - arg) );
+	};
+
+	Math.fact = function ( n ) {
+		var res = 1;
+		n = this.floor( n );
+		if ( n < 0 ) {
+			return NaN;
+		} else if (n > 170) {
+			return Infinity;
+		}
+		while ( n !== 0 ) {
+			res *= n--;
+		}
+		return res;
+	};
+
+	Math.doubleFact = function ( n ) {
+		var res = 1;
+		n = this.floor( n );
+		if ( n < 0 ) {
+			return NaN;
+		} else if (n > 170) {
+			return Infinity;
+		}
+//    n = Math.floor((n+1)/2);
+		while ( n > 0 ) {
+			res *= n;
+			n -= 2;
+		}
+		return res;
+	};
+
+	Math.factor = function ( n ) {
+		var res = 1;
+		n = this.floor( n );
+		while ( n !== 0 ) {
+			res = res * n--;
+		}
+		return res;
+	};
+
+	Math.ln = Math.log;
+
+	Math.log10 = function ( x ) {
+		return this.log( x ) / this.log( 10 );
+	};
+
+	Math.log1p = Math.log1p || function(x) {
+		return Math.log(1 + x);
+	};
+
+	Math.expm1 = Math.expm1 || function(x) {
+		return Math.exp(x) - 1;
+	};
+
+	Math.binomCoeff = function ( n, k ) {
+		return this.fact( n ) / (this.fact( k ) * this.fact( n - k ));
+	};
+
+	Math.permut = function ( n, k ) {
+		return this.floor( this.fact( n ) / this.fact( n - k ) + 0.5 );
+	};
+
+	Math.approxEqual = function ( a, b ) {
+		if ( a === b ) {
+			return true;
+		}
+		return this.abs( a - b ) < 1e-15;
+	};
+
+	if (typeof Math.sign != 'function') {
+		Math['sign'] = Math.sign = function (n) {
+			return n == 0 ? 0 : n < 0 ? -1 : 1;
+		};
+	}
+
+	Math.trunc = Math.trunc || function(v) {
+		v = +v;
+		return (v - v % 1)   ||   (!isFinite(v) || v === 0 ? v : v < 0 ? -0 : 0);
+	};
+
 	if (typeof require === 'function' && !window['XRegExp'])
 	{
 		window['XRegExp'] = require('xregexp');
@@ -165,6 +284,7 @@
 	var sUploadServiceLocalUrl = "../../../../upload";
 	var sUploadServiceLocalUrlOld = "../../../../uploadold";
 	var sSaveFileLocalUrl = "../../../../savefile";
+	var sDownloadFileLocalUrl = "../../../../downloadfile";
 	var nMaxRequestLength = 5242880;//5mb <requestLimits maxAllowedContentLength="30000000" /> default 30mb
 
 	function getSockJs()
@@ -309,10 +429,7 @@
 
 	function DocumentUrls()
 	{
-		this.urls = {};
-		this.urlsReverse = {};
-		this.documentUrl = "";
-		this.imageCount = 0;
+		this.Clear();
 	}
 
 	DocumentUrls.prototype = {
@@ -321,6 +438,13 @@
 						 {
 							 this.addUrls(urls);
 						 },
+		Clear:			function ()
+						{
+							this.urls = {};
+							this.urlsReverse = {};
+							this.documentUrl = "";
+							this.imageCount = 0;
+						},
 		getUrls:         function ()
 						 {
 							 return this.urls;
@@ -423,7 +547,7 @@
 			if (AscBrowser.isIE || AscBrowser.isIeEdge)
 			{
 				this.map[type] = ("url(../../../../sdkjs/common/Images/cursors/" + name + ".cur), " + default_css_value);
-                this.mapRetina[type] = ("url(../../../../sdkjs/common/Images/cursors/" + name + "_2x.cur), " + default_css_value);
+				this.mapRetina[type] = ("url(../../../../sdkjs/common/Images/cursors/" + name + "_2x.cur), " + default_css_value);
 			}
 			else if (window.opera)
 			{
@@ -433,13 +557,13 @@
 			{
 				if (!AscCommon.AscBrowser.isChrome && !AscCommon.AscBrowser.isSafari)
 				{
-                    this.map[type] = "url('../../../../sdkjs/common/Images/cursors/" + name + ".svg') " + target +
-                        ", url('../../../../sdkjs/common/Images/cursors/" + name + ".png') " + target + ", " + default_css_value;
-                }
-                else
+					this.map[type] = "url('../../../../sdkjs/common/Images/cursors/" + name + ".svg') " + target +
+						", url('../../../../sdkjs/common/Images/cursors/" + name + ".png') " + target + ", " + default_css_value;
+				}
+				else
 				{
-                    this.map[type] = "-webkit-image-set(url(../../../../sdkjs/common/Images/cursors/" + name + ".png) 1x," +
-                        " url(../../../../sdkjs/common/Images/cursors/" + name + "_2x.png) 2x) " + target + ", " + default_css_value;
+					this.map[type] = "-webkit-image-set(url(../../../../sdkjs/common/Images/cursors/" + name + ".png) 1x," +
+						" url(../../../../sdkjs/common/Images/cursors/" + name + "_2x.png) 2x) " + target + ", " + default_css_value;
 				}
 			}
 		};
@@ -526,7 +650,7 @@
 			ext += "+xml";
 		if (null !== ext && oZipImages && (content = oZipImages[name]))
 		{
-			return 'data:image/' + ext + ';base64,' + AscCommon.Base64Encode(content, content.length, 0);
+			return 'data:image/' + ext + ';base64,' + AscCommon.Base64.encode(content);
 		}
 		return null;
 	}
@@ -565,7 +689,7 @@
 		}
 		return false;
 	}
-	function openFileCommand(binUrl, changesUrl, Signature, callback)
+	function openFileCommand(docId, binUrl, changesUrl, changesToken, Signature, callback)
 	{
 		var bError = false, oResult = new OpenFileResult(), bEndLoadFile = false, bEndLoadChanges = false;
 		var onEndOpen = function ()
@@ -610,16 +734,11 @@
 		if (changesUrl)
 		{
 			oZipImages = {};
-			getJSZipUtils().getBinaryContent(changesUrl, function (err, data)
-			{
-				if (err)
-				{
-					bEndLoadChanges = true;
-					bError = true;
-					onEndOpen();
-					return;
-				}
-
+			AscCommon.DownloadOriginalFile(docId, changesUrl, 'changesUrl', changesToken, function () {
+				bEndLoadChanges = true;
+				bError = true;
+				onEndOpen();
+			}, function(data) {
 				oResult.changes = [];
 				getJSZip().loadAsync(data).then(function (zipChanges)
 				{
@@ -1181,7 +1300,7 @@
 
 	function build_rx_table(local)
 	{
-		cStrucTableLocalColumns = ( local ? local : {
+		window["AscCommon"].cStrucTableLocalColumns = cStrucTableLocalColumns = ( local ? local : {
 			"h":  "Headers",
 			"d":  "Data",
 			"a":  "All",
@@ -1330,6 +1449,11 @@
 		SupportedFormats: ["docx", "doc", "docm", "dot", "dotm", "dotx", "epub", "fodt", "odt", "ott", "rtf", "wps"]
 	};
 
+	var c_oAscSpreadsheetUploadProp = {
+		MaxFileSize:      104857600, //100 mb
+		SupportedFormats: ["xlsx", "xlsm", "xls", "ods", "csv", "xltx", "xltm", "xlt", "fods", "ots"]
+	};
+
 	var c_oAscTextUploadProp = {
 		MaxFileSize:      25000000, //25 mb
 		SupportedFormats: ["txt", "csv"]
@@ -1427,6 +1551,24 @@
 				break;
 			case c_oAscFileType.OTT:
 				return 'ott';
+				break;
+			case c_oAscFileType.DOC_FLAT:
+				return 'doc';
+				break;
+			case c_oAscFileType.DOCX_FLAT:
+				return 'docx';
+				break;
+			case c_oAscFileType.HTML_IN_CONTAINER:
+				return 'zip';
+				break;
+			case c_oAscFileType.DOCX_PACKAGE:
+				return 'xml';
+				break;
+			case c_oAscFileType.OFORM:
+				return 'oform';
+				break;
+			case c_oAscFileType.DOCXF:
+				return 'docxf';
 				break;
 			case c_oAscFileType.DOCY:
 				return 'doct';
@@ -1679,6 +1821,11 @@
 			callback(Asc.c_oAscError.ID.Unknown);
 		}
 	}
+	function ShowSpreadsheetFileDialog(callback) {
+		if (false === _ShowFileDialog(getAcceptByArray(c_oAscSpreadsheetUploadProp.SupportedFormats), false, false, ValidateUploadSpreadsheet, callback)) {
+			callback(Asc.c_oAscError.ID.Unknown);
+		}
+	}
 	function ShowTextFileDialog(callback) {
 		if (false === _ShowFileDialog(getAcceptByArray(c_oAscTextUploadProp.SupportedFormats), false, false, ValidateUploadText, callback)) {
 			callback(Asc.c_oAscError.ID.Unknown);
@@ -1765,6 +1912,20 @@
 		}
 	}
 
+	function DownloadOriginalFile(documentId, url, urlPathInToken, token, fError, fSuccess) {
+		asc_ajax({
+			url: sDownloadFileLocalUrl + '/' + documentId,
+			responseType: "arraybuffer",
+			headers: {
+				'Authorization': 'Bearer ' + token,
+				'x-url': url
+			},
+			success: function(resp) {
+				fSuccess(resp.response);
+			},
+			error: fError
+		});
+	}
 	function UploadImageFiles(files, documentId, documentUserId, jwt, callback)
 	{
 		if (files.length > 0)
@@ -1942,6 +2103,10 @@
 	function ValidateUploadDocument(files)
 	{
 		return ValidateUpload(files, c_oAscServerError.UploadDocumentExtension, c_oAscServerError.UploadDocumentContentLength, c_oAscServerError.UploadDocumentCountFiles, c_oAscDocumentUploadProp);
+	}
+	function ValidateUploadSpreadsheet(files)
+	{
+		return ValidateUpload(files, c_oAscServerError.UploadDocumentExtension, c_oAscServerError.UploadDocumentContentLength, c_oAscServerError.UploadDocumentCountFiles, c_oAscSpreadsheetUploadProp);
 	}
 	function ValidateUploadText(files)
 	{
@@ -3177,6 +3342,7 @@
 			error = null, success = null, httpRequest = null,
 			contentType                               = "application/x-www-form-urlencoded",
 			responseType = '',
+			headers = null,
 
 			init                                      = function (obj)
 			{
@@ -3215,6 +3381,10 @@
 				if (typeof (obj.responseType) !== 'undefined')
 				{
 					responseType = obj.responseType;
+				}
+				if (typeof (obj.headers) !== 'undefined')
+				{
+					headers = obj.headers;
 				}
 
 				if (window.XMLHttpRequest)
@@ -3255,6 +3425,13 @@
 				httpRequest.open(type, url, async);
 				if (type === "POST")
 					httpRequest.setRequestHeader("Content-Type", contentType);
+				if (headers) {
+					for (var header in headers) {
+						if (headers.hasOwnProperty(header)) {
+							httpRequest.setRequestHeader(header, headers[header]);
+						}
+					}
+				}
 				if (responseType)
 					httpRequest.responseType = responseType;
 				httpRequest.send(data);
@@ -4103,9 +4280,20 @@
 		return sResult;
 	}
 
+	/**
+	 * Корректируем значение размера шрифта к допустимому
+	 * @param {number} nFontSize
+	 * @param {boolean} isCeil
+	 */
+	function CorrectFontSize(nFontSize, isCeil)
+	{
+		return isCeil ? Math.ceil(nFontSize * 2) / 2 : Math.floor(nFontSize * 2) / 2;
+	}
+
 	var c_oAscSpaces = [];
 	c_oAscSpaces[0x000A] = 1;
 	c_oAscSpaces[0x0020] = 1;
+	c_oAscSpaces[0x00A0] = 1;
 	c_oAscSpaces[0x2002] = 1;
 	c_oAscSpaces[0x2003] = 1;
 	c_oAscSpaces[0x2005] = 1;
@@ -4113,13 +4301,63 @@
 	c_oAscSpaces[0xFEFF] = 1;
 
 	/**
-	 * Проверяем является ли заданный юников пробелом
+	 * Проверяем является ли заданный юникод пробелом
 	 * @param nUnicode {number}
 	 * @returns {boolean}
 	 */
 	function IsSpace(nUnicode)
 	{
 		return !!(c_oAscSpaces[nUnicode]);
+	}
+
+	/**
+	 * Переводим числовое значение в Hex строку
+	 * @param nValue
+	 * @returns {string}
+	 */
+	function IntToHex(nValue)
+	{
+		var sRes = nValue.toString(16);
+		if (sRes.length === 2)
+			sRes = "00" + sRes;
+		else if (sRes.length === 3)
+			sRes = "0" + sRes;
+		return sRes;
+	}
+
+	/**
+	 * Проверяем является ли заданный юникод цифрой
+	 * @param nUnicode {number}
+	 * @returns {boolean}
+	 */
+	function IsDigit(nUnicode)
+	{
+		return (nUnicode >= 48 && nUnicode <= 57);
+	}
+
+	/**
+	 * Проверяем является ли заданный юникод цифрой
+	 * @param nUnicode {number}
+	 * @returns {boolean}
+	 */
+	function IsLetter(nUnicode)
+	{
+		return (String.fromCodePoint(nUnicode).search(new RegExp("^\\p{L}", 'u')) !== -1);
+	}
+
+	/**
+	 * Присутствует ли символ заданного шрифта в шрифте ASCW3
+	 * @param sFontFamily
+	 * @param nUnicode
+	 * @returns {boolean}
+	 */
+	function IsAscFontSupport(sFontFamily, nUnicode)
+	{
+		return ("Segoe UI Symbol" === sFontFamily
+			&& (0x25C9 === nUnicode
+				|| 0x25CB === nUnicode
+				|| 0x2611 === nUnicode
+				|| 0x2610 === nUnicode));
 	}
 
 	function private_IsAbbreviation(sWord) {
@@ -5795,40 +6033,180 @@
 		var x, y;
 		var eps = 0.0001;
 
+		// 0 left, 1 down, 2 right, 3 up
+		var directions = [];
+		var isUseShift = (shiftX > 0.1 || shiftY > 0.1) ? true : false;
+
+		if (isUseShift)
+		{
+			for (var nIndex = 0; nIndex < nCount; nIndex++)
+			{
+				if (Math.abs(PrevX - Points[nIndex].X) < eps && Math.abs(PrevY - Points[nIndex].Y) < eps)
+					continue;
+
+				if (PrevX > (Points[nIndex].X + eps))
+				{
+					directions.push(0)
+				}
+				else if (PrevX < (Points[nIndex].X - eps))
+				{
+					directions.push(2);
+				}
+
+				if (PrevY > (Points[nIndex].Y + eps))
+				{
+					directions.push(3);
+				}
+				else if (PrevY < (Points[nIndex].Y - eps))
+				{
+					directions.push(1);
+				}
+				PrevX = Points[nIndex].X;
+				PrevY = Points[nIndex].Y;
+			}
+		}
+
+		PrevX = Points[nCount - 2].X;
+		PrevY = Points[nCount - 2].Y;
+		var directionIndex = 0;
 		for (var nIndex = 0; nIndex < nCount; nIndex++)
 		{
+			if (Math.abs(PrevX - Points[nIndex].X) < eps && Math.abs(PrevY - Points[nIndex].Y) < eps)
+				continue;
+
 			x = transform ? transform.TransformPointX(Points[nIndex].X, Points[nIndex].Y) : Points[nIndex].X;
 			y = transform ? transform.TransformPointY(Points[nIndex].X, Points[nIndex].Y) : Points[nIndex].Y;
 
 			x = (left + dKoefX * x) * rPR;
 			y = (top + dKoefY * y) * rPR;
 
-			if (shiftX > 0.1 || shiftY > 0.1)
+			if (isUseShift)
 			{
-				// заточка на то, что это ректы
-				if (PrevX > (Points[nIndex].X + eps))
+				var nextDirection = (directionIndex === (directions.length - 1)) ? directions[0] : directions[directionIndex + 1];
+				switch (directions[directionIndex])
 				{
-					x -= shiftX;
-					y -= shiftY;
-				}
-				else if (PrevX < (Points[nIndex].X - eps))
-				{
-					x += shiftX;
-					y += shiftY;
-				}
-
-				if (PrevY > (Points[nIndex].Y + eps))
-				{
-					x += shiftX;
-					y -= shiftY;
-				}
-				else if (PrevY < (Points[nIndex].Y - eps))
-				{
-					x -= shiftX;
-					y += shiftY;
+					case 0:
+					{
+						switch (nextDirection)
+						{
+							case 0:
+							{
+								y -= shiftY;
+								break
+							}
+							case 1:
+							{
+								x -= shiftX;
+								y -= shiftY;
+								break;
+							}
+							case 2:
+							{
+								break;
+							}
+							case 3:
+							{
+								x += shiftX;
+								y -= shiftY;
+								break;
+							}
+							default:
+								break;
+						}
+						break;
+					}
+					case 1:
+					{
+						switch (nextDirection)
+						{
+							case 0:
+							{
+								x -= shiftX;
+								y -= shiftY;
+								break;
+							}
+							case 1:
+							{
+								x -= shiftX;
+								break;
+							}
+							case 2:
+							{
+								x -= shiftX;
+								y += shiftY;
+								break
+							}
+							case 3:
+							default:
+								break;
+						}
+						break;
+					}
+					case 2:
+					{
+						switch (nextDirection)
+						{
+							case 0:
+							{
+								break;
+							}
+							case 1:
+							{
+								x -= shiftX;
+								y += shiftY;
+								break;
+							}
+							case 2:
+							{
+								y += shiftY;
+								break;
+							}
+							case 3:
+							{
+								x += shiftX;
+								y += shiftY;
+								break;
+							}
+							default:
+								break;
+						}
+						break;
+					}
+					case 3:
+					{
+						switch (nextDirection)
+						{
+							case 0:
+							{
+								x += shiftX;
+								y -= shiftY;
+								break;
+							}
+							case 1:
+							{
+								break;
+							}
+							case 2:
+							{
+								x += shiftX;
+								y += shiftY;
+								break;
+							}
+							case 3:
+							{
+								x += shiftX;
+							}
+							default:
+								break;
+						}
+						break;
+					}
+					default:
+						break;
 				}
 			}
 
+			directionIndex++;
 			PrevX = Points[nIndex].X;
 			PrevY = Points[nIndex].Y;
 
@@ -5908,6 +6286,236 @@
 	{
 		return this.MathSelectPolygons[nIndex];
 	};
+
+	function CDrawingCollaborativeTargetBase()
+	{
+		this.Id      = "";
+		this.ShortId = "";
+
+		this.X    = 0;
+		this.Y    = 0;
+		this.Size = 0;
+
+		this.Color     = null;
+		this.Transform = null;
+
+		this.HtmlElement  = null;
+		this.HtmlElementX = 0;
+		this.HtmlElementY = 0;
+
+		this.Style = "";
+		this.HtmlParent = null;
+	}
+	CDrawingCollaborativeTargetBase.prototype.CreateElement = function()
+	{
+		this.HtmlElement = document.createElement('canvas');
+		this.HtmlElement.style.cssText = "pointer-events: none;position:absolute;padding:0;margin:0;-webkit-user-select:none;width:1px;height:1px;display:block;z-index:3;";
+		this.HtmlElement.width = 1;
+		this.HtmlElement.height = 1;
+
+		this.Color = AscCommon.getUserColorById(this.ShortId, null, true);
+		this.Style = "rgb(" + this.Color.r + "," + this.Color.g + "," + this.Color.b + ")";
+	};
+	CDrawingCollaborativeTargetBase.prototype.GetZoom = function()
+	{
+		return 1.0;
+	};
+	CDrawingCollaborativeTargetBase.prototype.CheckStyleDisplay = function()
+	{
+	};
+	CDrawingCollaborativeTargetBase.prototype.ConvertCoords = function(x, y)
+	{
+		return {
+			X: (x * this.GetZoom() * AscCommon.g_dKoef_mm_to_pix ) >> 0,
+			Y: (y * this.GetZoom() * AscCommon.g_dKoef_mm_to_pix ) >> 0
+		};
+	};
+	CDrawingCollaborativeTargetBase.prototype.GetMobileTouchManager = function()
+	{
+		return null;
+	};
+	CDrawingCollaborativeTargetBase.prototype.UseStylePosition = function()
+	{
+		return (!this.GetMobileTouchManager() && !AscCommon.AscBrowser.isSafariMacOs) || !AscCommon.AscBrowser.isWebkit;
+	};
+	CDrawingCollaborativeTargetBase.prototype.GetParentElement = function()
+	{
+		return null;
+	};
+	CDrawingCollaborativeTargetBase.prototype.CalculateSizeAndPos = function()
+	{
+		var _newW = 2;
+		var _newH = (this.Size * this.GetZoom() * AscCommon.g_dKoef_mm_to_pix) >> 0;
+
+		var _oldW = this.HtmlElement.width;
+		var _oldH = this.HtmlElement.height;
+
+		if (null != this.Transform && !AscCommon.global_MatrixTransformer.IsIdentity2(this.Transform))
+		{
+			var _x1 = this.Transform.TransformPointX(this.X, this.Y);
+			var _y1 = this.Transform.TransformPointY(this.X, this.Y);
+
+			var _x2 = this.Transform.TransformPointX(this.X, this.Y + this.Size);
+			var _y2 = this.Transform.TransformPointY(this.X, this.Y + this.Size);
+
+			var pos1 = this.ConvertCoords(_x1, _y1);
+			var pos2 = this.ConvertCoords(_x2, _y2);
+
+			_newW = (Math.abs(pos1.X - pos2.X) >> 0) + 1;
+			_newH = (Math.abs(pos1.Y - pos2.Y) >> 0) + 1;
+
+			if (2 > _newW)
+				_newW = 2;
+			if (2 > _newH)
+				_newH = 2;
+
+			if (_oldW == _newW && _oldH == _newH)
+			{
+				if (_newW != 2 && _newH != 2)
+				{
+					// просто очищаем
+					this.HtmlElement.width = _newW;
+				}
+			}
+			else
+			{
+				this.HtmlElement.style.width = _newW + "px";
+				this.HtmlElement.style.height = _newH + "px";
+
+				this.HtmlElement.width = _newW;
+				this.HtmlElement.height = _newH;
+			}
+			var ctx = this.HtmlElement.getContext('2d');
+
+			if (_newW == 2 || _newH == 2)
+			{
+				ctx.fillStyle = this.Style;
+				ctx.fillRect(0, 0, _newW, _newH);
+			}
+			else
+			{
+				ctx.beginPath();
+				ctx.strokeStyle = this.Style;
+				ctx.lineWidth = 2;
+
+				if (((pos1.X - pos2.X) * (pos1.Y - pos2.Y)) >= 0)
+				{
+					ctx.moveTo(0, 0);
+					ctx.lineTo(_newW, _newH);
+				}
+				else
+				{
+					ctx.moveTo(0, _newH);
+					ctx.lineTo(_newW, 0);
+				}
+
+				ctx.stroke();
+			}
+
+			this.HtmlElementX = Math.min(pos1.X, pos2.X) >> 0;
+			this.HtmlElementY = Math.min(pos1.Y, pos2.Y) >> 0;
+			if (this.UseStylePosition())
+			{
+				this.HtmlElement.style.left = this.HtmlElementX + "px";
+				this.HtmlElement.style.top = this.HtmlElementY + "px";
+			}
+			else
+			{
+				this.HtmlElement.style.left = "0px";
+				this.HtmlElement.style.top = "0px";
+				this.HtmlElement.style["webkitTransform"] = "matrix(1, 0, 0, 1, " + this.HtmlElementX + "," + this.HtmlElementY + ")";
+			}
+		}
+		else
+		{
+			if (_oldW == _newW && _oldH == _newH)
+			{
+				// просто очищаем
+				this.HtmlElement.width = _newW;
+			}
+			else
+			{
+				this.HtmlElement.style.width = _newW + "px";
+				this.HtmlElement.style.height = _newH + "px";
+
+				this.HtmlElement.width = _newW;
+				this.HtmlElement.height = _newH;
+			}
+
+			var ctx = this.HtmlElement.getContext('2d');
+
+			ctx.fillStyle = this.Style;
+			ctx.fillRect(0, 0, _newW, _newH);
+
+			var pos;
+			if (null != this.Transform)
+			{
+				pos = this.ConvertCoords(this.Transform.tx + this.X, this.Transform.ty + this.Y);
+			}
+			else
+			{
+				pos = this.ConvertCoords(this.X, this.Y);
+			}
+
+			this.HtmlElementX = pos.X >> 0;
+			this.HtmlElementY = pos.Y >> 0;
+
+			if (this.UseStylePosition())
+			{
+				this.HtmlElement.style.left = this.HtmlElementX + "px";
+				this.HtmlElement.style.top = this.HtmlElementY + "px";
+			}
+			else
+			{
+				this.HtmlElement.style.left = "0px";
+				this.HtmlElement.style.top = "0px";
+				this.HtmlElement.style["webkitTransform"] = "matrix(1, 0, 0, 1, " + this.HtmlElementX + "," + this.HtmlElementY + ")";
+			}
+		}
+	};
+	CDrawingCollaborativeTargetBase.prototype.CheckPosition = function()
+	{
+	};
+	CDrawingCollaborativeTargetBase.prototype.CheckNeedDraw = function()
+	{
+		return true;
+	};
+	CDrawingCollaborativeTargetBase.prototype.Remove = function()
+	{
+		if(this.HtmlParent)
+		{
+			this.HtmlParent.removeChild(this.HtmlElement);
+			this.HtmlParent = null;
+		}
+	};
+	CDrawingCollaborativeTargetBase.prototype.Update = function()
+	{
+		// 1) создаем новый элемент, если еще его не было
+		if (this.HtmlElement == null)
+		{
+			this.CreateElement();
+		}
+
+		if(!this.CheckNeedDraw())
+		{
+			return;
+		}
+		// 2) определяем размер
+		this.CalculateSizeAndPos();
+
+		if (AscCommon.CollaborativeEditing)
+			AscCommon.CollaborativeEditing.Update_ForeignCursorLabelPosition(this.Id, this.HtmlElementX, this.HtmlElementY, this.Color);
+
+		// 3) добавить, если нужно
+		var oParentElement = this.GetParentElement();
+		if(oParentElement && oParentElement !== this.HtmlParent)
+		{
+			oParentElement.appendChild(this.HtmlElement);
+			this.HtmlParent = oParentElement;
+		}
+		this.CheckStyleDisplay();
+	};
+
 
 	//------------------------------------------------------------fill polyfill--------------------------------------------
 	if (!Array.prototype.findIndex) {
@@ -6042,6 +6650,8 @@
 					break;
 			}
 		}
+
+		var textQualifier = options.asc_getTextQualifier();
 		var matrix = [];
 		//var rows = text.match(/[^\r\n]+/g);
 		var rows = text.split(/\r?\n/);
@@ -6055,7 +6665,45 @@
 				row = addSpace ? delimiterChar + row.trim() : row.trim();
 			}
 			//todo quotes
-			matrix.push(row.split(delimiterChar));
+			if (textQualifier) {
+				var _text = "";
+				var startQualifier = false;
+				for (var j = 0; j < row.length; j++) {
+					if (!startQualifier && row[j] === textQualifier && (!row[j - 1] || (row[j - 1] && row[j - 1] === delimiterChar))) {
+						startQualifier = !startQualifier;
+						continue;
+					} else if (startQualifier && row[j] === textQualifier) {
+						startQualifier = !startQualifier;
+
+						if (j === row.length - 1) {
+							if (!matrix[i]) {
+								matrix[i] = [];
+							}
+							matrix[i].push(_text);
+						}
+
+						continue;
+					}
+					
+					if (!startQualifier && row[j] === delimiterChar) {
+						if (!matrix[i]) {
+							matrix[i] = [];
+						}
+						matrix[i].push(_text);
+						_text = "";
+					} else {
+						_text += row[j];
+						if (j === row.length - 1) {
+							if (!matrix[i]) {
+								matrix[i] = [];
+							}
+							matrix[i].push(_text);
+						}
+					}
+				}
+			} else {
+				matrix.push(row.split(delimiterChar));	
+			}
 		}
 		return matrix;
 	}
@@ -6366,7 +7014,7 @@
 		var new_height = 0;
 
 		// в мозилле поправили баг. отключаем особую ветку
-		if (true || !AscCommon.AscBrowser.isMozilla)
+		if (!AscCommon.AscBrowser.isMozilla)
 		{
 			new_width = Math.round(scale * rect.right) - Math.round(scale * rect.left);
 			new_height = Math.round(scale * rect.bottom) - Math.round(scale * rect.top);
@@ -6558,10 +7206,12 @@
 	window["AscCommon"].InitOnMessage = InitOnMessage;
 	window["AscCommon"].ShowImageFileDialog = ShowImageFileDialog;
 	window["AscCommon"].ShowDocumentFileDialog = ShowDocumentFileDialog;
+	window["AscCommon"].ShowSpreadsheetFileDialog = ShowSpreadsheetFileDialog;
 	window["AscCommon"].ShowTextFileDialog = ShowTextFileDialog;
 	window["AscCommon"].InitDragAndDrop = InitDragAndDrop;
 	window["AscCommon"].UploadImageFiles = UploadImageFiles;
     window["AscCommon"].UploadImageUrls = UploadImageUrls;
+	window["AscCommon"].DownloadOriginalFile = DownloadOriginalFile;
 	window["AscCommon"].CanDropFiles = CanDropFiles;
 	window["AscCommon"].getUrlType = getUrlType;
 	window["AscCommon"].prepareUrl = prepareUrl;
@@ -6588,6 +7238,11 @@
 	window["AscCommon"].LatinNumberingToInt = LatinNumberingToInt;
 	window["AscCommon"].IntToNumberFormat = IntToNumberFormat;
 	window["AscCommon"].IsSpace = IsSpace;
+	window["AscCommon"].IntToHex = IntToHex;
+	window["AscCommon"].IsDigit = IsDigit;
+	window["AscCommon"].IsLetter = IsLetter;
+	window["AscCommon"].CorrectFontSize = CorrectFontSize;
+	window["AscCommon"].IsAscFontSupport = IsAscFontSupport;
 
 	window["AscCommon"].loadSdk = loadSdk;
     window["AscCommon"].loadScript = loadScript;
@@ -6601,6 +7256,7 @@
 	window["AscCommon"].isEastAsianScript = isEastAsianScript;
 	window["AscCommon"].CMathTrack = CMathTrack;
 	window["AscCommon"].CPolygon = CPolygon;
+	window['AscCommon'].CDrawingCollaborativeTargetBase = CDrawingCollaborativeTargetBase;
 
 	window["AscCommon"].JSZipWrapper = JSZipWrapper;
 	window["AscCommon"].g_oDocumentUrls = g_oDocumentUrls;

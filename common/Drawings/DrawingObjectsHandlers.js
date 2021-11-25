@@ -57,6 +57,7 @@ function handleSelectedObjects(drawingObjectsController, e, x, y, group, pageInd
     }
     var selected_objects = group ? group.selectedObjects : drawingObjectsController.getSelectedObjects();
     var oCropSelection = drawingObjectsController.selection.cropSelection ? drawingObjectsController.selection.cropSelection : null;
+    var oGeometryEditSelection = drawingObjectsController.selection.geometrySelection ? drawingObjectsController.selection.geometrySelection : null;
     var tx, ty, t, hit_to_handles;
     var ret = null;
     var drawing = null;
@@ -166,7 +167,7 @@ function handleSelectedObjects(drawingObjectsController, e, x, y, group, pageInd
                 ty = y;
             }
             
-            if(selected_objects[0].canChangeAdjustments())
+            if(selected_objects[0].canChangeAdjustments() && !oGeometryEditSelection)
             {
                 var hit_to_adj = selected_objects[0].hitToAdjustment(tx, ty);
                 if(hit_to_adj.hit)
@@ -206,7 +207,7 @@ function handleSelectedObjects(drawingObjectsController, e, x, y, group, pageInd
             if(!ret)
             {
                 hit_to_handles = selected_objects[i].hitToHandles(tx, ty);
-                if(hit_to_handles > -1)
+                if(hit_to_handles > -1 && !oGeometryEditSelection)
                 {
 
                     if(window["IS_NATIVE_EDITOR"] && e.ClickCount > 1)
@@ -220,6 +221,15 @@ function handleSelectedObjects(drawingObjectsController, e, x, y, group, pageInd
                     drawing = selected_objects[i];
                     break;
                 }
+            }
+        }
+    }
+
+    if(!ret) {
+        if(oGeometryEditSelection) {
+            ret = oGeometryEditSelection.handle(drawingObjectsController, e, x, y);
+            if(ret) {
+                return ret;
             }
         }
     }
@@ -247,7 +257,7 @@ function handleSelectedObjects(drawingObjectsController, e, x, y, group, pageInd
             if(!ret)
             {
 
-                if(selected_objects[i].hitInBoundingRect(tx, ty))
+                if(selected_objects[i].hitInBoundingRect(tx, ty) && !oGeometryEditSelection)
                 {
                     if(window["IS_NATIVE_EDITOR"])
                     {
@@ -321,13 +331,14 @@ function handleFloatObjects(drawingObjectsController, drawingArr, e, x, y, group
                 break;
             }
             case AscDFH.historyitem_type_GroupShape:
+            case AscDFH.historyitem_type_SmartArt:
             {
                 ret = handleGroup(drawing, drawingObjectsController, e, x, y, group, pageIndex, bWord);
                 break;
             }
             case AscDFH.historyitem_type_GraphicFrame:
             {
-                ret = !drawingObjectsController.isSlideShow() && handleFloatTable(drawing, drawingObjectsController, e, x, y, group, pageIndex);
+                ret = handleFloatTable(drawing, drawingObjectsController, e, x, y, group, pageIndex);
                 break;
             }
         }
@@ -447,6 +458,14 @@ function handleShapeImage(drawing, drawingObjectsController, e, x, y, group, pag
             var sMediaFile = drawing.getMediaFileName();
             if(!sMediaFile)
             {
+                var oAnimPlayer = drawingObjectsController.getAnimationPlayer();
+                if(oAnimPlayer)
+                {
+                    if(drawingObjectsController.handleEventMode === HANDLE_EVENT_MODE_HANDLE && oAnimPlayer.onSpClick(drawing))
+                    {
+                        return true;
+                    }
+                }
                 return false;
             }
         }
@@ -456,6 +475,11 @@ function handleShapeImage(drawing, drawingObjectsController, e, x, y, group, pag
     {
         if(bWord/* && (!drawing.txWarpStruct || drawingObjectsController.curState.startTargetTextObject === drawing || drawing.haveSelectedDrawingInContent && drawing.haveSelectedDrawingInContent())*/)
         {
+            if(drawing.getObjectType() === AscDFH.historyitem_type_Shape &&
+                drawing.isForm() && drawing.getInnerForm() && drawing.getInnerForm().IsPicture())
+            {
+                return drawingObjectsController.handleMoveHit(drawing, e, x, y, group, false, pageIndex, bWord);
+            }
             var all_drawings = drawing.getDocContent().GetAllDrawingObjects();
             var drawings2 = [];
             for(var i = 0; i < all_drawings.length; ++i)
@@ -468,9 +492,19 @@ function handleShapeImage(drawing, drawingObjectsController, e, x, y, group, pag
         }
         if(drawingObjectsController.isSlideShow())
         {
-            if(!AscFormat.fCheckObjectHyperlink(drawing,x, y))
+            if(AscFormat.fCheckObjectHyperlink(drawing,x, y))
             {
-                return false;
+                return true;
+            }
+            if(drawing.hitInInnerArea(x, y))
+            {
+                var oAnimPlayer = drawingObjectsController.getAnimationPlayer();
+                if(oAnimPlayer)
+                {
+                    if(drawingObjectsController.handleEventMode === HANDLE_EVENT_MODE_HANDLE && oAnimPlayer.onSpClick(drawing)) {
+                        return true;
+                    }
+                }
             }
         }
         var oTextObject = AscFormat.getTargetTextObject(drawingObjectsController);
@@ -1841,6 +1875,11 @@ function handleInlineShapeImage(drawing, drawingObjectsController, e, x, y, page
     {
         if(drawing.bWordShape /*&& (!drawing.txWarpStruct || drawingObjectsController.curState.startTargetTextObject === drawing || drawing.haveSelectedDrawingInContent && drawing.haveSelectedDrawingInContent())*/)
         {
+            if(drawing.getObjectType() === AscDFH.historyitem_type_Shape &&
+                drawing.isForm() && drawing.getInnerForm() && drawing.getInnerForm().IsPicture())
+            {
+                return handleInlineHitNoText(drawing, drawingObjectsController, e, x, y, pageIndex, false);
+            }
             var all_drawings = drawing.getDocContent().GetAllDrawingObjects();
             var drawings2 = [];
             for(var i = 0; i < all_drawings.length; ++i)
@@ -1889,7 +1928,7 @@ function handleInlineHitNoText(drawing, drawingObjects, e, x, y, pageIndex, bInS
                 else if (drawing.signatureLine && drawingObjects.handleSignatureDblClick){
                     drawingObjects.handleSignatureDblClick(drawing.signatureLine.id, drawing.extX, drawing.extY);
                 }
-                else if (2 === e.ClickCount && drawing.parent instanceof ParaDrawing && drawing.parent.IsMathEquation())
+                else if (2 === e.ClickCount && drawing.parent instanceof AscCommonWord.ParaDrawing && drawing.parent.IsMathEquation())
                 {
                     drawingObjects.handleMathDrawingDoubleClick(drawing.parent, e, x, y, pageIndex);
                 }
@@ -1948,6 +1987,7 @@ function handleInlineObjects(drawingObjectsController, drawingArr, e, x, y, page
                 break;
             }
             case AscDFH.historyitem_type_GroupShape:
+            case AscDFH.historyitem_type_SmartArt:
             {
                 ret = handleGroup(drawing, drawingObjectsController, e, x, y, null, pageIndex, bWord);
                 if(ret)
@@ -1970,6 +2010,7 @@ function handleMouseUpPreMoveState(drawingObjects, e, x, y, pageIndex, bWord)
         switch (state.majorObject.getObjectType())
         {
             case AscDFH.historyitem_type_GroupShape:
+            case AscDFH.historyitem_type_SmartArt:
             {
                 state.drawingObjects.checkChartTextSelection();
                 state.drawingObjects.resetSelection();
@@ -2025,6 +2066,20 @@ function handleMouseUpPreMoveState(drawingObjects, e, x, y, pageIndex, bWord)
 
 function handleFloatTable(drawing, drawingObjectsController, e, x, y, group, pageIndex)
 {
+    if(drawingObjectsController.isSlideShow())
+    {
+        if(drawing.hitInInnerArea(x, y))
+        {
+            var oAnimPlayer = drawingObjectsController.getAnimationPlayer();
+            if(oAnimPlayer)
+            {
+                if(drawingObjectsController.handleEventMode === HANDLE_EVENT_MODE_HANDLE && oAnimPlayer.onSpClick(drawing)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     if(drawing.hitInBoundingRect(x, y))
     {
         return drawingObjectsController.handleMoveHit(drawing, e, x, y, group, false, pageIndex, false);

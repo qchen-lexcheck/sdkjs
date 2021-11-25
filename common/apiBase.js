@@ -72,6 +72,7 @@
 		this.documentUserId      = undefined;
 		this.documentUrl         = "null";
 		this.documentUrlChanges  = null;
+		this.documentTokenChanges  = null;
 		this.documentCallbackUrl = undefined;		// Ссылка для отправления информации о документе
 		this.documentFormat      = "null";
 		this.documentTitle       = "null";
@@ -180,6 +181,7 @@
 
 		this.disableAutostartMacros = false;
 		this.macros = null;
+		this.vbaMacros = null;
 
         this.openFileCryptBinary = null;
 
@@ -200,6 +202,8 @@
 
 		this.Shortcuts = new AscCommon.CShortcuts();
 		this.initDefaultShortcuts();
+
+		this.isUseNativeViewer = true;
 
 		return this;
 	}
@@ -505,12 +509,19 @@
 	baseEditorsApi.prototype.sync_InitEditorFonts            = function(gui_fonts)
 	{
 		if (!this.isViewMode) {
+			// корректируем имена для текущего языка интерфейса
+			var currentLang = this.asc_getLocale();
+			if (typeof currentLang !== "string")
+				currentLang = (AscCommon.g_oDefaultCultureInfo && (typeof AscCommon.g_oDefaultCultureInfo.Name === "string")) ? AscCommon.g_oDefaultCultureInfo.Name : "en";
+
+			AscFonts.g_fontApplication && AscFonts.g_fontApplication.CheckNamesForInterface(currentLang);
 			this.sendEvent("asc_onInitEditorFonts", gui_fonts);
 		}
 	};
 	baseEditorsApi.prototype.sync_StartAction                = function(type, id)
 	{
-		this.sendEvent('asc_onStartAction', type, id);
+		if (type !== c_oAscAsyncActionType.Empty)
+			this.sendEvent('asc_onStartAction', type, id);
 		//console.log("asc_onStartAction: type = " + type + " id = " + id);
 
 		if (c_oAscAsyncActionType.BlockInteraction === type)
@@ -520,7 +531,8 @@
 	};
 	baseEditorsApi.prototype.sync_EndAction                  = function(type, id)
 	{
-		this.sendEvent('asc_onEndAction', type, id);
+		if (type !== c_oAscAsyncActionType.Empty)
+			this.sendEvent('asc_onEndAction', type, id);
 		//console.log("asc_onEndAction: type = " + type + " id = " + id);
 
 		if (c_oAscAsyncActionType.BlockInteraction === type)
@@ -677,6 +689,21 @@
 				"lcid"          : locale,
 				"nobase64"      : true
 			};
+
+			if (this.isUseNativeViewer)
+			{
+				switch (this.documentFormat)
+				{
+					case "pdf":
+					case "xps":
+					case "djvu":
+						rData["convertToOrigin"] = true;
+						break;
+					default:
+						break;
+				}
+			}
+
 			if (versionHistory)
 			{
 				rData["serverVersion"] = versionHistory.serverVersion;
@@ -716,16 +743,22 @@
 	baseEditorsApi.prototype._openDocumentEndCallback            = function()
 	{
 	};
+	baseEditorsApi.prototype._openVersionHistoryEndCallback            = function()
+	{
+		this.sync_EndAction(c_oAscAsyncActionType.BlockInteraction, c_oAscAsyncAction.Open);
+	};
 	baseEditorsApi.prototype._openOnClient                       = function()
 	{
 	};
 	baseEditorsApi.prototype._onOpenCommand                      = function(data)
 	{
 		var t = this;
-		AscCommon.openFileCommand(data, this.documentUrlChanges, AscCommon.c_oSerFormat.Signature, function(error, result)
+		AscCommon.openFileCommand(this.documentId, data, this.documentUrlChanges, this.documentTokenChanges, AscCommon.c_oSerFormat.Signature, function(error, result)
 		{
-			if (error || (!result.bSerFormat && !Asc.c_rUneditableTypes.test(t.DocInfo && t.DocInfo.get_Format())))
+			var signature = result.data && String.fromCharCode(result.data[0], result.data[1], result.data[2], result.data[3]);
+			if (error || (!result.bSerFormat && (t.editorId !== c_oEditorId.Word || 'XLSY' === signature || 'PPTY' === signature)))
 			{
+				t.sync_EndAction(c_oAscAsyncActionType.BlockInteraction, c_oAscAsyncAction.Open);
 				var err = error ? c_oAscError.ID.Unknown : c_oAscError.ID.ConvertationOpenError;
 				t.sendEvent("asc_onError",  err, c_oAscError.Level.Critical);
 				return;
@@ -803,15 +836,17 @@
 
 		if (window["AscDesktopEditor"] && window["AscDesktopEditor"]["onDocumentContentReady"])
             window["AscDesktopEditor"]["onDocumentContentReady"]();
+
+		// теперь на старте нельзя удалить бинарник для подбора - он может пригодиться в nativeViewer
+		if (!this.disableRemoveFonts)
+			delete window["g_fonts_selection_bin"];
 	};
 	// Save
-	baseEditorsApi.prototype.processSavedFile                    = function(url, downloadType)
+	baseEditorsApi.prototype.processSavedFile                    = function(url, downloadType, filetype)
 	{
 		if (AscCommon.DownloadType.None !== downloadType)
 		{
-			this.sendEvent(downloadType, url, function(hasError)
-			{
-			});
+			this.sendEvent(downloadType, url, filetype);
 		}
 		else
 		{
@@ -1059,6 +1094,11 @@
 			t.sendEvent('asc_onCoAuthoringChatReceiveMessage', e, clear);
 		};
 		this.CoAuthoringApi.onServerVersion = function (buildVersion, buildNumber) {
+			if (t.isRestrictionView()) {
+				t.sync_EndAction(Asc.c_oAscAsyncActionType.Information, Asc.c_oAscAsyncAction.Disconnect);
+				t.asc_removeRestriction(Asc.c_oAscRestrictionType.View);
+			}
+
 			t.sendEvent('asc_onServerVersion', buildVersion, buildNumber);
 		};
 		this.CoAuthoringApi.onAuthParticipantsChanged = function(users, userId)
@@ -1247,10 +1287,17 @@
 				t.asyncServerIdEndLoaded();
 			}
 			if (null != opt_closeCode) {
+				if (t.isRestrictionView()) {
+					t.sync_EndAction(Asc.c_oAscAsyncActionType.Information, Asc.c_oAscAsyncAction.Disconnect);
+					t.asc_removeRestriction(Asc.c_oAscRestrictionType.View);
+				}
 				var error = AscCommon.getDisconnectErrorCode(t.isDocumentLoadComplete, opt_closeCode);
 				var level = t.isDocumentLoadComplete ? Asc.c_oAscError.Level.NoCritical : Asc.c_oAscError.Level.Critical;
 				t.setViewModeDisconnect(AscCommon.getEnableDownloadByCloseCode(opt_closeCode));
 				t.sendEvent('asc_onError', error, level);
+			} else if (!t.isRestrictionView()) {
+				t.sync_StartAction(Asc.c_oAscAsyncActionType.Information, Asc.c_oAscAsyncAction.Disconnect);
+				t.asc_addRestriction(Asc.c_oAscRestrictionType.View);
 			}
 		};
 		this.CoAuthoringApi.onDocumentOpen = function (inputWrap) {
@@ -1272,15 +1319,18 @@
 							case "ok":
 								var urls = input["data"];
 								AscCommon.g_oDocumentUrls.init(urls);
-								if (null != urls['Editor.bin']) {
+								var documentUrl = urls['Editor.bin'];
+								if (t.isUseNativeViewer && !documentUrl)
+									documentUrl = urls['origin.pdf'] || urls['origin.xps'] || urls['origin.djvu'];
+								if (null != documentUrl) {
 									if ('ok' === input["status"] || t.getViewMode()) {
-										t._onOpenCommand(urls['Editor.bin']);
+										t._onOpenCommand(documentUrl);
 									} else {
 										t.sendEvent("asc_onDocumentUpdateVersion", function () {
 											if (t.isCoAuthoringEnable) {
 												t.asc_coAuthoringDisconnect();
 											}
-											t._onOpenCommand(urls['Editor.bin']);
+											t._onOpenCommand(documentUrl);
 										})
 									}
 								} else {
@@ -1414,8 +1464,16 @@
 
             window["asc_nativeOnSpellCheck"] = function(response) {
                 var _editor = window["Asc"]["editor"] ? window["Asc"]["editor"] : window.editor;
-                if (_editor.SpellCheckApi)
-                    _editor.SpellCheckApi.onSpellCheck(response);
+                if (_editor.SpellCheckApi) {
+                	// поверяем на сообщение о полной очистке очереди задач для текущего
+                	if ("clear" === response) {
+						_editor.SpellCheckApi.isRestart = false;
+						return;
+					}
+					if (_editor.SpellCheckApi.isRestart === true)
+						return;
+					_editor.SpellCheckApi.onSpellCheck(response);
+				}
             };
 
 			this.SpellCheckApi.spellCheck = function (spellData) {
@@ -1423,6 +1481,11 @@
 			};
 			this.SpellCheckApi.disconnect = function () {
 			};
+			this.SpellCheckApi.restart = function() {
+				this.isRestart = true;
+				window["AscDesktopEditor"]["SpellCheck"]("clear");
+			};
+
 			if (window["AscDesktopEditor"]["IsLocalFile"] && !window["AscDesktopEditor"]["IsLocalFile"]())
 			{
 				this.sendEvent('asc_onSpellCheckInit', [
@@ -1479,6 +1542,7 @@
 				this.SpellCheckApi = {};
 				this.SpellCheckApi.log = false;
 				this.SpellCheckApi.worker = new CSpellchecker({
+					api: this,
 					enginePath: "../../../../sdkjs/common/spell/spell",
 					dictionariesPath: "./../../../../dictionaries"
 				});
@@ -1502,6 +1566,9 @@
 				};
 				this.SpellCheckApi.disconnect = function ()
 				{
+				};
+				this.SpellCheckApi.restart = function() {
+					this.worker.restart();
 				};
 
 				this.sendEvent('asc_onSpellCheckInit', this.SpellCheckApi.worker.getLanguages());
@@ -1535,6 +1602,9 @@
     baseEditorsApi.prototype.asc_spellCheckClearDictionary       = function()
     {
     };
+	baseEditorsApi.prototype.asc_restartCheckSpelling            = function()
+	{
+	};
 	// Print Desktop
 	baseEditorsApi.prototype._waitPrint                          = function (actionType, options)
 	{
@@ -1589,6 +1659,33 @@
 			oAdditionalData["withoutPassword"] = true;
 			oAdditionalData["inline"] = 1;
 		}
+		if (Asc.c_oAscFileType.JPG === options.fileType || Asc.c_oAscFileType.TIFF === options.fileType
+			|| Asc.c_oAscFileType.TGA === options.fileType || Asc.c_oAscFileType.GIF === options.fileType
+			|| Asc.c_oAscFileType.PNG === options.fileType || Asc.c_oAscFileType.EMF === options.fileType
+			|| Asc.c_oAscFileType.WMF === options.fileType || Asc.c_oAscFileType.BMP === options.fileType
+			|| Asc.c_oAscFileType.CR2 === options.fileType || Asc.c_oAscFileType.PCX === options.fileType
+			|| Asc.c_oAscFileType.RAS === options.fileType || Asc.c_oAscFileType.PSD === options.fileType
+			|| Asc.c_oAscFileType.ICO === options.fileType) {
+			oAdditionalData["thumbnail"] = {
+				"aspect": 2,
+				"first": false
+			}
+			switch (options.fileType) {
+				case Asc.c_oAscFileType.PNG:
+					oAdditionalData["thumbnail"]["format"] = 4;
+					break;
+				case Asc.c_oAscFileType.GIF:
+					oAdditionalData["thumbnail"]["format"] = 2;
+					break;
+				case Asc.c_oAscFileType.BMP:
+					oAdditionalData["thumbnail"]["format"] = 1;
+					break;
+				default:
+					oAdditionalData["thumbnail"]["format"] = 3;
+					break;
+			}
+			oAdditionalData["title"] = AscCommon.changeFileExtention(this.documentTitle, "zip", Asc.c_nMaxDownloadTitleLen);
+		}
 
 		if (this._downloadAs(actionType, options, oAdditionalData, dataContainer))
 		{
@@ -1611,13 +1708,13 @@
 						if (url)
 						{
 							error = c_oAscError.ID.No;
-							t.processSavedFile(url, downloadType);
+							t.processSavedFile(url, downloadType, input["filetype"]);
 						}
 					}
 					else
 					{
 						error = AscCommon.mapAscServerErrorToAscError(parseInt(input["data"]),
-							AscCommon.c_oAscAdvancedOptionsAction.Save);
+							(options && options.isGetTextFromUrl) ? AscCommon.c_oAscAdvancedOptionsAction.Open : AscCommon.c_oAscAdvancedOptionsAction.Save);
 					}
 				}
 				if (c_oAscError.ID.No !== error)
@@ -1668,6 +1765,36 @@
 		return this.textArtPreviewManager.getWordArtPreviews();
 	};
 	// Add image
+	baseEditorsApi.prototype.AddImageUrl       = function(urls, imgProp, token, obj)
+	{
+		if (this.isLongAction()) {
+			return;
+		}
+		var t = this;
+		var toSendUrls = [];
+		var toSendIndex = [];
+		for (var i = 0; i < urls.length; ++i) {
+			if (!AscCommon.g_oDocumentUrls.getLocal(urls[i])) {
+				toSendIndex.push(i);
+				toSendUrls.push(urls[i]);
+			}
+		}
+		var callback = function(urls) {
+			t._addImageUrl(urls, obj);
+		};
+		if (toSendUrls.length > 0) {
+			AscCommon.sendImgUrls(this, toSendUrls, function(data) {
+				if (data) {
+					data.forEach(function(currentValue, index) {
+						urls[toSendIndex[index]] = currentValue.url;
+					});
+					callback.call(t, urls);
+				}
+			}, false, undefined, token);
+		} else {
+			callback.call(this, urls);
+		}
+	};
 	baseEditorsApi.prototype._addImageUrl                        = function()
 	{
 	};
@@ -1856,6 +1983,9 @@
 			this.asc_coAuthoringDisconnect();
 		}
 
+		if (this.SpellCheckApi && this.SpellCheckApi.restart /* старый спеллчек (серверный - не поддеживает этот метод */)
+			this.SpellCheckApi.restart();
+
 		var bUpdate = true;
 		if (null === this.VersionHistory) {
 			this.VersionHistory = new window["Asc"].asc_CVersionHistory(newObj);
@@ -1869,12 +1999,16 @@
 			this.DocInfo.put_Id(this.VersionHistory.docId);
 			this.DocInfo.put_Url(this.VersionHistory.url);
 			this.documentUrlChanges = this.VersionHistory.urlChanges;
+			this.documentTokenChanges = this.VersionHistory.token;
 			this.asc_setDocInfo(this.DocInfo);
 			this.asc_LoadDocument(this.VersionHistory);
 		} else if (this.VersionHistory.currentChangeId < newObj.currentChangeId) {
+			var oApi = Asc.editor || editor;
+			this.isApplyChangesOnVersionHistory = true;
+			this.sync_StartAction(c_oAscAsyncActionType.BlockInteraction, c_oAscAsyncAction.Open);
 			// Нужно только добавить некоторые изменения
 			AscCommon.CollaborativeEditing.Clear_CollaborativeMarks();
-			editor.VersionHistory.applyChanges(editor);
+			oApi.VersionHistory.applyChanges(oApi);
 			AscCommon.CollaborativeEditing.Apply_Changes();
 		}
 	};
@@ -1892,11 +2026,15 @@
 		if (window["AscDesktopEditor"] && this._printDesktop(options)) {
 			return;
 		}
+		if (this.isLongAction()) {
+			return;
+		}
 
 		if (!options) {
 			options = new Asc.asc_CDownloadOptions();
 		}
 		options.fileType = Asc.c_oAscFileType.PDF;
+		options.isPdfPrint = true;
 		this.downloadAs(c_oAscAsyncAction.Print, options);
 	};
 	baseEditorsApi.prototype.asc_Save = function (isAutoSave, isIdle) {
@@ -2116,7 +2254,10 @@
 			asc_color_scheme = AscCommon.getAscColorScheme(_scheme, theme);
 			nIndex = AscCommon.getIndexColorSchemeInArray(result, asc_color_scheme);
 			if(nIndex === -1) {
-				aCustomSchemes.push(asc_color_scheme);
+				var nIdxInCustom = AscCommon.getIndexColorSchemeInArray(aCustomSchemes, asc_color_scheme);
+				if(nIdxInCustom === -1) {
+					aCustomSchemes.push(asc_color_scheme);
+				}
 			}
 			aCustomSchemes.sort(function (a, b) {
 				if(a.name === "" || a.name === null) return -1;
@@ -2135,12 +2276,7 @@
 			result = result.concat(aCustomSchemes);
 
 			if(nIndex === -1) {
-				for (i = 0; i < result.length; ++i) {
-					if (result[i] === asc_color_scheme) {
-						nIndex = i;
-						break;
-					}
-				}
+				nIndex = AscCommon.getIndexColorSchemeInArray(result, asc_color_scheme);
 			}
 		}
 		return {schemes: result, index: nIndex};
@@ -2277,6 +2413,10 @@
     };
     baseEditorsApi.prototype.endInlineDropTarget = function(e)
     {
+    };
+    baseEditorsApi.prototype.isSliderDragged = function()
+    {
+		return this.noCreatePoint || this.exucuteHistory || this.exucuteHistoryEnd;
     };
 
     baseEditorsApi.prototype["asc_insertSymbol"] = function(familyName, code, pr)

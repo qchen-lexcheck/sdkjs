@@ -1554,7 +1554,11 @@ Asc['asc_docs_api'].prototype["Call_Menu_Event"] = function(type, _params)
         }
         case 56: // ASC_MENU_EVENT_TYPE_INSERT_PAGENUMBER
         {
-            this.put_PageNum((_params[0] >> 16) & 0xFFFF, _params[0] & 0xFFFF);
+            if (_params[0] < 0) {
+                this.put_PageNum(-1);
+            } else {
+                this.put_PageNum((_params[0] >> 16) & 0xFFFF, _params[0] & 0xFFFF);
+            }
             break;
         }
         case 57: // ASC_MENU_EVENT_TYPE_INSERT_SECTIONBREAK
@@ -2158,10 +2162,11 @@ Asc['asc_docs_api'].prototype["Call_Menu_Event"] = function(type, _params)
             break;
         }
         case 202: // ASC_MENU_EVENT_TYPE_DOCUMENT_PDFBASE64
+        case 203: // ASC_MENU_EVENT_TYPE_DOCUMENT_PDFBASE64_PRINT
         {
             var _stream = global_memory_stream_menu;
             _stream["ClearNoAttack"]();
-            _stream["WriteStringA"](this.WordControl.m_oDrawingDocument.ToRenderer());
+            _stream["WriteStringA"](this.WordControl.m_oDrawingDocument.ToRenderer(203 === type));
             _return = _stream;
             break;
         }
@@ -4169,6 +4174,12 @@ function asc_menu_ReadShapePr(_params, _cursor)
             case 6:
             {
                 _settings.InsertPageNum = _params[_cursor.pos++];
+                break;
+            }
+            case 7:
+            {
+                _settings.bFromGroup = _params[_cursor.pos++];
+                break;
             }
             case 255:
             default:
@@ -4207,6 +4218,12 @@ function asc_menu_WriteShapePr(_type, _shapePr, _stream)
     {
         _stream["WriteByte"](5);
         _stream["WriteBool"](_shapePr.bFromChart);
+    }
+    //6 - InsertPageNum
+    if (_shapePr.bFromGroup !== undefined && _shapePr.bFromGroup !== null)
+    {
+        _stream["WriteByte"](7);
+        _stream["WriteBool"](_shapePr.bFromGroup);
     }
 
     _stream["WriteByte"](255);
@@ -5985,6 +6002,7 @@ function NativeOpenFile3(_params, documentInfo)
                                   asc_WriteColorSchemes(schemes, stream);
                                   window["native"]["OnCallMenuEvent"](2404, stream); // ASC_SPREADSHEETS_EVENT_TYPE_COLOR_SCHEMES
                                   });
+        _api.asc_registerCallback("asc_onSendThemeColors", onApiSendThemeColors);
 
         _api.asc_registerCallback("asc_onFocusObject", onFocusObject);
         _api.asc_registerCallback('asc_onStartAction', onApiLongActionBegin);
@@ -6067,6 +6085,7 @@ function NativeOpenFile3(_params, documentInfo)
 
             if (null != _api.WordControl.m_oLogicDocument)
             {
+                _api.WordControl.m_oDrawingDocument.CheckGuiControlColors();
                 _api.sendColorThemes(_api.WordControl.m_oLogicDocument.theme);
             }
 
@@ -6444,8 +6463,8 @@ function onApiShowRevisionsChange(data) {
                         changes.push("|Change tabs|");
                     if (value.Get_NumPr() !== undefined)
                         changes.push("|Change numbering|");
-                    if (value.Get_PStyle() !== undefined) {
-                        var style = me.api.asc_GetStyleNameById(value.Get_PStyle());
+                    if (value.GetPStyle() !== undefined) {
+                        var style = me.api.asc_GetStyleNameById(value.GetPStyle());
                         if (!_.isEmpty(style)) {
                             changes.push(style)
                         }
@@ -6704,6 +6723,16 @@ function contentControllListAToJSON(obj) {
 
 // Common
 
+function getHexColor(r, g, b) {
+    r = r.toString(16);
+    g = g.toString(16);
+    b = b.toString(16);
+    if (r.length == 1) r = '0' + r;
+    if (g.length == 1) g = '0' + g;
+    if (b.length == 1) b = '0' + b;
+    return r + g + b;
+}
+
 function onFocusObject(SelectedObjects) {
     var settings = [];
     var isChart = false;
@@ -6775,6 +6804,20 @@ function onApiError(id, level, errData) {
         "errData" : JSON.prune(errData, 4),
     };
     postDataAsJSONString(info, 26104); // ASC_MENU_EVENT_TYPE_API_ERROR
+}
+
+function onApiSendThemeColors(theme_colors, standart_colors) {
+    var colors = {
+        "themeColors": theme_colors.map(function(color) {
+            return getHexColor(color.get_r(), color.get_g(), color.get_b());
+        })
+    }
+    if (standart_colors != null) {
+        colors["standartColors"] = standart_colors.map(function(color) {
+            return getHexColor(color.get_r(), color.get_g(), color.get_b());
+        });
+    }
+    postDataAsJSONString(colors, 2417); // ASC_MENU_EVENT_TYPE_THEMECOLORS
 }
 
 // Others
@@ -6913,6 +6956,7 @@ Asc['asc_docs_api'].prototype.openDocument = function(file)
         
         if (null != _api.WordControl.m_oLogicDocument)
         {
+            _api.WordControl.m_oDrawingDocument.CheckGuiControlColors();
             _api.sendColorThemes(_api.WordControl.m_oLogicDocument.theme);
         }
   
@@ -6941,7 +6985,8 @@ Asc['asc_docs_api'].prototype.openDocument = function(file)
 
     if (null != _api.WordControl.m_oLogicDocument)
     {
-         _api.sendColorThemes(_api.WordControl.m_oLogicDocument.theme);
+        _api.WordControl.m_oDrawingDocument.CheckGuiControlColors();
+        _api.sendColorThemes(_api.WordControl.m_oLogicDocument.theme);
     }
 
     window["native"]["onEndLoadingFile"]();
