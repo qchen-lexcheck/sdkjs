@@ -12777,22 +12777,25 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 	}
 	function isInComplexField(oRun, aFields)
 	{
+		var oFieldStartPos, oFieldEndPos, oRunDocPos;
 		for (var nCompField = 0; nCompField < aFields.length; nCompField++)
 		{
 			oFieldStartPos = aFields[nCompField].GetStartDocumentPosition();
 			oFieldEndPos   = aFields[nCompField].GetEndDocumentPosition();
 			oRunDocPos     = oRun.GetDocumentPositionFromObject();
+			oRunDocPos.push({Class: oRun, Position: oRun.Content.length});
 
 			if (private_checkRelativePos(oFieldStartPos, oRunDocPos) === 1 && private_checkRelativePos(oFieldEndPos, oRunDocPos) === -1)
-				return true;
+				return -1;
 		}
 
-		return false;
+		return oFieldEndPos[oFieldEndPos.length - 1].Position;
 	}
 	function TrySplitPara(oPara, YCoord)
 	{
 		// нужно скипать сложные поля
-		var aComplesFields = oPara.GetCurrentComplexFields();
+		var aComplexFields = oPara.GetAllComplexFields();
+		var oParaPosToChekFields = null;
 		var oFieldStartPos = null;
 		var oFieldEndPos   = null;
 		var oRunDocPos     = null;
@@ -12807,22 +12810,29 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 				var nRunIndex    = oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos;
 				var oRunForSplit = oPara.Content[nRunIndex];
 				var oTempElm     = null;
+				var nPosInPara   = oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos;
+				var nLineInRun   = nLine - 1 - oRunForSplit.StartLine;
+				var nRunEndPos   = -1;
 
 				if (!(oRunForSplit instanceof ParaRun))
 					return null;
 
 				// нужно обрезать по тому рану, который не лежит в сложном поле
-				if (isInComplexField(oRunForSplit, aComplesFields))
+				if (aComplexFields.length > 0 && isInComplexField(oRunForSplit, aComplexFields) === - 1)
 				{
 					for (var nElm = nRunIndex; nElm < oPara.Content.length; nElm++)
 					{
-						if (oPara.Content[nElm] instanceof ParaRun && isInComplexField(oPara.Content[nElm], aComplesFields))
+						if (oPara.Content[nElm] instanceof ParaRun)
 						{
+							nRunEndPos = isInComplexField(oPara.Content[nElm], aComplexFields);
+							if (nRunEndPos === - 1)
+								continue;
+
 							oTempElm = oPara.Content[nElm];
+							nPosInPara = nElm;
+							nLineInRun = oTempElm.StartLine - oTempElm.GetLineByPosition(nPosInPara);
 							break;
 						}
-						else
-							continue;
 					}
 
 					if (oTempElm)
@@ -12831,11 +12841,11 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 						return null;
 				}
 
-				var oRunEndPos   = Math.max(0, oRunForSplit.protected_GetRangeEndPos(nLine - 1 - oRunForSplit.StartLine, 0));
+				var nRunEndPos   = nRunEndPos === - 1 ? Math.max(0, oRunForSplit.protected_GetRangeEndPos(nLineInRun, 0)) : nRunEndPos;
 
 				var oContentPos  = new CParagraphContentPos();
-				oContentPos.Add(oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos);
-				oContentPos.Add(oRunEndPos);
+				oContentPos.Add(nPosInPara);
+				oContentPos.Add(nRunEndPos);
 				var oResultPara = oPara.Split(null, oContentPos);
 
 				// удаляем знаки переноса строки

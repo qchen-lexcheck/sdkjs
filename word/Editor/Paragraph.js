@@ -8788,6 +8788,24 @@ Paragraph.prototype.GetSelectedContent = function(oSelectedContent)
 		oSelectedContent.Add(new CSelectedElement(oPara, isAllSelected));
 	}
 };
+Paragraph.prototype.GetAllComplexFields = function()
+{
+	var arrComplexFields = [];
+	var arrTemp          = [];
+	var nEndPos          = this.Content.length;
+
+	for (var nIndex = 0; nIndex < nEndPos; nIndex++)
+	{
+		if (this.Content[nIndex].GetCurrentComplexFields)
+		{
+			this.Content[nIndex].GetCurrentComplexFields(arrTemp);
+			arrComplexFields = arrComplexFields.concat(arrTemp);
+			arrTemp          = [];
+		}
+	}
+
+	return arrComplexFields;
+};
 Paragraph.prototype.CheckHitInParaEnd = function(X, Y, CurPage)
 {
 	var oContentPos = this.Get_ParaContentPosByXY(X, Y, CurPage, false, true).InTextPos;
