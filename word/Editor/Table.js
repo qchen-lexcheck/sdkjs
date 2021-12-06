@@ -12763,6 +12763,9 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 			{
 				var oRunForSplit = oPara.Content[oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos];
 
+				if (!(oRunForSplit instanceof ParaRun))
+					return null;
+
 				var oRunEndPos   = Math.max(0, oRunForSplit.protected_GetRangeEndPos(nLine - 1 - oRunForSplit.StartLine, 0));
 
 				var oContentPos  = new CParagraphContentPos();
@@ -12773,10 +12776,15 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 				// удаляем знаки переноса строки
 				for (var nRun = 0; nRun < oResultPara.Content.length; nRun++)
 				{
-					if (oResultPara.Content[nRun].Content.length > 0 && oResultPara.Content[nRun].Content[0].Type === para_NewLine)
+					if (oResultPara.Content[nRun] instanceof ParaRun && oResultPara.Content[nRun].Content.length > 0)
 					{
-						oResultPara.Content[nRun].RemoveFromContent(0, 1);
-						break;
+						if (oResultPara.Content[nRun].Content[0].Type === para_NewLine)
+						{
+							oResultPara.Content[nRun].RemoveFromContent(0, 1);
+							break;
+						}
+						else
+							break;
 					}
 						
 				}
@@ -12787,7 +12795,6 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 						oPara.Content[nRun].RemoveFromContent(oPara.Content[nRun].Content.length - 1, 1);
 						break;
 					}
-						
 				}
 
 				return oResultPara;
