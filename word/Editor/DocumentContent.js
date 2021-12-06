@@ -2663,7 +2663,7 @@ CDocumentContent.prototype.UpdateCursorType = function(X, Y, CurPage)
 //-----------------------------------------------------------------------------------
 // Функции для работы с контентом
 //-----------------------------------------------------------------------------------
-CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
+CDocumentContent.prototype.AddNewParagraph = function(bForceAdd, bSelectAddedItem)
 {
     if (docpostype_DrawingObjects === this.CurPos.Type)
     {
@@ -2675,10 +2675,13 @@ CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
             return false;
 
         // Сначала удаляем заселекченую часть
-        if (true === this.Selection.Use)
-        {
-            this.Remove(1, true, false, true);
-        }
+		if (!bSelectAddedItem)
+		{
+			if (true === this.Selection.Use)
+			{
+				this.Remove(1, true, false, true);
+			}
+		}
 
         // Добавляем новый параграф
         var Item = this.Content[this.CurPos.ContentPos];
@@ -2718,7 +2721,10 @@ CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
 
 					var nContentPos = this.CurPos.ContentPos;
 					this.AddToContent(nContentPos, NewParagraph);
-					this.CurPos.ContentPos = nContentPos + 1;
+					if (bSelectAddedItem)
+						this.CurPos.ContentPos = nContentPos;
+					else
+						this.CurPos.ContentPos = nContentPos + 1;
 				}
 				else
 				{
@@ -2773,7 +2779,10 @@ CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
 
 					var nContentPos = this.CurPos.ContentPos + 1;
 					this.AddToContent(nContentPos, NewParagraph);
-					this.CurPos.ContentPos = nContentPos;
+					if (bSelectAddedItem)
+						this.CurPos.ContentPos = nContentPos - 1;
+					else
+						this.CurPos.ContentPos = nContentPos;
 				}
 
                 if (true === this.IsTrackRevisions())
@@ -2833,7 +2842,7 @@ CDocumentContent.prototype.AddNewParagraph = function(bForceAdd)
 			}
 			else
 			{
-				Item.AddNewParagraph();
+				Item.AddNewParagraph(undefined, bSelectAddedItem);
 			}
 		}
 	}

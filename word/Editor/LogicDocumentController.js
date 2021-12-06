@@ -57,9 +57,9 @@ CLogicDocumentController.prototype.GetCurPage = function()
 {
 	return this.LogicDocument.controller_GetCurPage();
 };
-CLogicDocumentController.prototype.AddNewParagraph = function(bRecalculate, bForceAdd)
+CLogicDocumentController.prototype.AddNewParagraph = function(bRecalculate, bForceAdd, bSelectAddedItem)
 {
-	return this.LogicDocument.controller_AddNewParagraph(bRecalculate, bForceAdd);
+	return this.LogicDocument.controller_AddNewParagraph(bRecalculate, bForceAdd, bSelectAddedItem);
 };
 CLogicDocumentController.prototype.AddInlineImage = function(nW, nH, oImage, oChart, bFlow)
 {

@@ -6149,9 +6149,9 @@ CDocument.prototype.DrawPageBorders = function(Graphics, oSectPr, nPageIndex)
  * @param bRecalculate
  * @param bForceAdd - добавляем параграф, пропуская всякие проверки типа пустого параграфа с нумерацией.
  */
-CDocument.prototype.AddNewParagraph = function(bRecalculate, bForceAdd)
+CDocument.prototype.AddNewParagraph = function(bRecalculate, bForceAdd, bSelectAddedItem)
 {
-	this.Controller.AddNewParagraph(bRecalculate, bForceAdd);
+	this.Controller.AddNewParagraph(bRecalculate, bForceAdd, bSelectAddedItem);
 
 	if (false !== bRecalculate)
 		this.Recalculate();
@@ -18716,7 +18716,7 @@ CDocument.prototype.controller_GetCurPage = function()
 
 	return -1;
 };
-CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAdd)
+CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAdd, bSelectAddedItem)
 {
 	if (this.CurPos.ContentPos < 0)
 		return false;
@@ -18766,7 +18766,10 @@ CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAd
 
 				var nContentPos = this.CurPos.ContentPos;
 				this.AddToContent(nContentPos, NewParagraph);
-				this.CurPos.ContentPos = nContentPos + 1;
+				if (bSelectAddedItem)
+				    this.CurPos.ContentPos = nContentPos;
+				else
+					this.CurPos.ContentPos = nContentPos + 1;
 			}
 			else
 			{
@@ -18826,7 +18829,10 @@ CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAd
 
 				var nContentPos = this.CurPos.ContentPos + 1;
 				this.AddToContent(nContentPos, NewParagraph);
-				this.CurPos.ContentPos = nContentPos;
+				if (bSelectAddedItem)
+				    this.CurPos.ContentPos = nContentPos - 1;
+				else
+				    this.CurPos.ContentPos = nContentPos;
 			}
 
 			if (true === this.IsTrackRevisions())
@@ -18886,7 +18892,7 @@ CDocument.prototype.controller_AddNewParagraph = function(bRecalculate, bForceAd
 		}
 		else
 		{
-			Item.AddNewParagraph();
+			Item.AddNewParagraph(undefined, bSelectAddedItem);
 		}
 	}
 };
@@ -25528,6 +25534,40 @@ CDocument.prototype.IsAllRequiredSpecialFormsFilled = function()
 
 	return true;
 };
+/**
+ * Получаем позицию в контенте документа по элементу
+ * @param oElement
+ * @returns {number}
+ */
+ CDocument.prototype.GetPosByElementInDocument = function(oElement)
+ {
+	 var IsDoucument = false;
+	 while (!IsDoucument)
+	 {
+		 var Parent;
+		 if ("IsCell" in oElement && oElement.IsCell())
+		 {
+			 Parent = oElement.GetTableParent();
+			 oElement = oElement.GetTable();
+		 }
+		 else
+		 {
+			 Parent = oElement.GetParent();
+		 }
+		 if (Parent != null && "IsDocumentEditor" in Parent && Parent.IsDocumentEditor())
+		 {
+			 for (var i = 0; i < Parent.Content.length - 1; i++)
+			 {
+				 if (Parent.Content[i] === oElement)
+					 return i;
+			 }
+		 }
+		 else
+		 {
+			 oElement = Parent;
+		 }
+	 }
+ };
 /**
  * Конвертируем
  * @param sId

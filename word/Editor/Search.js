@@ -202,14 +202,19 @@ CDocumentSearch.prototype.Replace = function(sReplaceString, Id, bRestorePos)
 				var StartContentPos = SearchElement.StartPos;
 				var StartRun        = SearchElement.ClassesS[SearchElement.ClassesS.length - 1];
 
+				oPara.Selection.Use = true;
+				oPara.Set_SelectionContentPos(SearchElement.StartPos, SearchElement.EndPos);
+				
+				oPara.Remove();
+
 				var RunPos = StartContentPos.Get(SearchElement.ClassesS.length - 1);
 				this.private_AddReplacedStringToRun(StartRun, RunPos);
 			}
 
 			// Выделяем старый объект поиска и удаляем его
-			oPara.Selection.Use = true;
+			/*oPara.Selection.Use = true;
 			oPara.Set_SelectionContentPos(SearchElement.StartPos, SearchElement.EndPos);
-			oPara.Remove();
+			oPara.Remove();*/
 
 			// Перемещаем курсор в конец поиска
 			oPara.RemoveSelection();
@@ -234,6 +239,7 @@ CDocumentSearch.prototype.Replace = function(sReplaceString, Id, bRestorePos)
 CDocumentSearch.prototype.private_AddReplacedStringToRun = function(oRun, nInRunPos)
 {
 	var isMathRun = oRun.IsMathRun();
+	var arrForParaEnds = [];
 	for (var nIndex = 0, nAdd = 0, nCount = this.InsertPattern.GetLength(); nIndex < nCount; ++nIndex)
 	{
 		var oItem = this.InsertPattern.Get(nIndex).ToRunElement(isMathRun);
@@ -241,6 +247,26 @@ CDocumentSearch.prototype.private_AddReplacedStringToRun = function(oRun, nInRun
 		{
 			oRun.AddToContent(nInRunPos + nAdd, oItem, false);
 			nAdd++;
+		}
+		else if (this.InsertPattern.Get(nIndex).GetType() === c_oSearchItemType.ParaEnd)
+		{
+			arrForParaEnds.push(nInRunPos + nAdd);
+		}
+	}
+	if (arrForParaEnds[0] !== null && !isMathRun)
+	{
+		for (var i = arrForParaEnds.length - 1; i >= 0; i--)
+		{
+			var nPosInDocument = oRun.Paragraph.LogicDocument.GetPosByElementInDocument(oRun.Paragraph);
+			oRun.Paragraph.LogicDocument.Set_CurrentElement(nPosInDocument);
+			var ContentPos = oRun.Paragraph.Get_ParaContentPos(false, false);
+			ContentPos.Data[ContentPos.Depth - 1] = arrForParaEnds[i];
+			oRun.Paragraph.Set_ParaContentPos(ContentPos, true, -1, -1);
+			oRun.Paragraph.LogicDocument.Selection.Use = false;
+			oRun.Paragraph.Selection.Use = false;
+			oRun.Paragraph.LogicDocument.AddNewParagraph(undefined, undefined, true);
+			oRun.Paragraph.Selection.Use = true;
+			oRun.Paragraph.LogicDocument.Selection.Use = true;
 		}
 	}
 };
@@ -829,9 +855,19 @@ CDocument.prototype.ReplaceSearchElement = function(NewStr, bAll, Id, bInterface
 	{
 		this.StartAction(bAll ? AscDFH.historydescription_Document_ReplaceAll : AscDFH.historydescription_Document_ReplaceSingle);
 
-		for (var nIndex = 0; nIndex < nReplacedCount; ++nIndex)
+		if (bAll)
 		{
-			this.SearchEngine.Replace(NewStr, arrReplaceId[nIndex], false);
+			for (var nIndex = nReplacedCount - 1; nIndex >= 0; --nIndex)
+			{
+				this.SearchEngine.Replace(NewStr, arrReplaceId[nIndex], false);
+			}
+		}
+		else
+		{
+			for (var nIndex = 0; nIndex < nReplacedCount; ++nIndex)
+			{
+				this.SearchEngine.Replace(NewStr, arrReplaceId[nIndex], false);
+			}
 		}
 
 		// Если остались элементы поиска, тогда не очищаем текущий поиск
@@ -855,7 +891,10 @@ CDocument.prototype.ReplaceSearchElement = function(NewStr, bAll, Id, bInterface
     this.Document_UpdateSelectionState();
     this.Document_UpdateRulersState();
 
-    return bResult;
+	this.SearchEngine.Clear();
+	this.SearchEngine = this.Search(this.SearchEngine.Text, {Word: this.SearchEngine.Word, MatchCase: this.SearchEngine.MatchCase});
+    
+	return bResult;
 };
 CDocument.prototype.GetSearchElementId = function(bNext)
 {

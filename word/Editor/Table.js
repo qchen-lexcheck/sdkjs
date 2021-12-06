@@ -5956,9 +5956,9 @@ CTable.prototype.IsCursorAtEnd = function()
 //----------------------------------------------------------------------------------------------------------------------
 // Работаем с содержимым таблицы
 //----------------------------------------------------------------------------------------------------------------------
-CTable.prototype.AddNewParagraph = function()
+CTable.prototype.AddNewParagraph = function(bForceAdd, bSelectAddedItem)
 {
-	this.CurCell.Content.AddNewParagraph();
+	this.CurCell.Content.AddNewParagraph(undefined, bSelectAddedItem);
 };
 CTable.prototype.AddInlineImage = function(W, H, Img, Chart, bFlow)
 {
