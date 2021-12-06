@@ -12750,10 +12750,28 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 			ElmsToTransfer = [];
 		}
 	}
+	function check_pos(firstPos, secondPos)
+	{
+		for (var nPos = 0, nLen = Math.min(firstPos.length, secondPos.length); nPos < nLen; ++nPos)
+		{
+			if (!secondPos[nPos] || !firstPos[nPos] || firstPos[nPos].Class !== secondPos[nPos].Class)
+				return 1;
 
+			if (firstPos[nPos].Position < secondPos[nPos].Position)
+				return 1;
+			else if (firstPos[nPos].Position > secondPos[nPos].Position)
+				return -1;
+		}
+
+		return 1;
+	}
 	function TrySplitPara(oPara, YCoord)
 	{
-		
+		// нужно скипать сложные поля
+		var aComplesFields = oPara.GetCurrentComplexFields();
+		var oFieldStartPos = null;
+		var oFieldEndPos   = null;
+
 		for (var nLine = 1; nLine < oPara.Lines.length; nLine++)
 		{
 			var oBounds1 = oPara.GetLineBounds(nLine - 1);
@@ -12765,6 +12783,13 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 
 				if (!(oRunForSplit instanceof ParaRun))
 					return null;
+
+				// если райн лежит в поле - скипаем
+				for (var nCompField = 0; nCompField < aComplesFields.length; nCompField++)
+				{
+					oFieldStartPos = aComplesFields[nCompField].GetStartDocumentPosition();
+					oFieldEndPos   = aComplesFields[nCompField].GetEndDocumentPosition();
+				}
 
 				var oRunEndPos   = Math.max(0, oRunForSplit.protected_GetRangeEndPos(nLine - 1 - oRunForSplit.StartLine, 0));
 
