@@ -12750,7 +12750,17 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 			ElmsToTransfer = [];
 		}
 	}
-	function check_pos(firstPos, secondPos)
+	/**
+	 * Get the first Run in the array specified.
+	 * @typeofeditors ["CDE"]
+	 * @param {Array} firstPos - first doc pos of element
+	 * @param {Array} secondPos - second doc pos of element
+	 * @return {1 || 0 || - 1}
+	 * If returns 1  -> first element placed before second
+	 * If returns 0  -> first element placed like second
+	 * If returns -1 -> first element placed after second
+	 */
+	function private_checkRelativePos(firstPos, secondPos)
 	{
 		for (var nPos = 0, nLen = Math.min(firstPos.length, secondPos.length); nPos < nLen; ++nPos)
 		{
@@ -12762,8 +12772,22 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 			else if (firstPos[nPos].Position > secondPos[nPos].Position)
 				return -1;
 		}
+ 
+		return 0;
+	}
+	function isInComplexField(oRun, aFields)
+	{
+		for (var nCompField = 0; nCompField < aFields.length; nCompField++)
+		{
+			oFieldStartPos = aFields[nCompField].GetStartDocumentPosition();
+			oFieldEndPos   = aFields[nCompField].GetEndDocumentPosition();
+			oRunDocPos     = oRun.GetDocumentPositionFromObject();
 
-		return 1;
+			if (private_checkRelativePos(oFieldStartPos, oRunDocPos) === 1 && private_checkRelativePos(oFieldEndPos, oRunDocPos) === -1)
+				return true;
+		}
+
+		return false;
 	}
 	function TrySplitPara(oPara, YCoord)
 	{
@@ -12771,6 +12795,7 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 		var aComplesFields = oPara.GetCurrentComplexFields();
 		var oFieldStartPos = null;
 		var oFieldEndPos   = null;
+		var oRunDocPos     = null;
 
 		for (var nLine = 1; nLine < oPara.Lines.length; nLine++)
 		{
@@ -12779,16 +12804,31 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 
 			if (YCoord >= oBounds1.Bottom - (oBounds1.Bottom - oBounds1.Top) / 2  - 1.5 && YCoord <= oBounds2.Bottom - (oBounds2.Bottom - oBounds2.Top) / 2)
 			{
-				var oRunForSplit = oPara.Content[oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos];
+				var nRunIndex    = oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos;
+				var oRunForSplit = oPara.Content[nRunIndex];
+				var oTempElm     = null;
 
 				if (!(oRunForSplit instanceof ParaRun))
 					return null;
 
-				// если райн лежит в поле - скипаем
-				for (var nCompField = 0; nCompField < aComplesFields.length; nCompField++)
+				// нужно обрезать по тому рану, который не лежит в сложном поле
+				if (isInComplexField(oRunForSplit, aComplesFields))
 				{
-					oFieldStartPos = aComplesFields[nCompField].GetStartDocumentPosition();
-					oFieldEndPos   = aComplesFields[nCompField].GetEndDocumentPosition();
+					for (var nElm = nRunIndex; nElm < oPara.Content.length; nElm++)
+					{
+						if (oPara.Content[nElm] instanceof ParaRun && isInComplexField(oPara.Content[nElm], aComplesFields))
+						{
+							oTempElm = oPara.Content[nElm];
+							break;
+						}
+						else
+							continue;
+					}
+
+					if (oTempElm)
+						oRunForSplit = oTempElm;
+					else
+						return null;
 				}
 
 				var oRunEndPos   = Math.max(0, oRunForSplit.protected_GetRangeEndPos(nLine - 1 - oRunForSplit.StartLine, 0));
