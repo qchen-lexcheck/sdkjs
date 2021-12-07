@@ -12794,7 +12794,7 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 	function TrySplitPara(oPara, YCoord)
 	{
 		// нужно скипать сложные поля
-		var aComplexFields = oPara.GetAllComplexFields();
+		//var aComplexFields = oPara.GetAllComplexFields();
 		var oParaPosToChekFields = null;
 		var oFieldStartPos = null;
 		var oFieldEndPos   = null;
@@ -12809,6 +12809,11 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 			{
 				var nRunIndex    = oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos;
 				var oRunForSplit = oPara.Content[nRunIndex];
+				var oParaPosForCheckField = new CParagraphContentPos();
+				oParaPosForCheckField.Add(nRunIndex);
+				oParaPosForCheckField.Add(0);
+				var aComplexFields = oPara.GetComplexFieldsByPos(oParaPosForCheckField);
+
 				var oTempElm     = null;
 				var nPosInPara   = oPara.Lines[nLine - 1].Ranges[oPara.Lines[nLine - 1].Ranges.length - 1].EndPos;
 				var nLineInRun   = nLine - 1 - oRunForSplit.StartLine;
@@ -12824,6 +12829,11 @@ CTable.prototype.HorSplitCells = function(Y, RowIndex, CellsIndexes, CurPageStar
 					{
 						if (oPara.Content[nElm] instanceof ParaRun)
 						{
+							var oParaPosForCheckField = new CParagraphContentPos();
+							oParaPosForCheckField.Add(nElm);
+							oParaPosForCheckField.Add(0);
+							aComplexFields = oPara.GetComplexFieldsByPos(oParaPosForCheckField);
+							
 							nRunEndPos = isInComplexField(oPara.Content[nElm], aComplexFields);
 							if (nRunEndPos === - 1)
 								continue;
