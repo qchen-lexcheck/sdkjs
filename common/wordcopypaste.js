@@ -2216,6 +2216,7 @@ function PasteProcessor(api, bUploadImage, bUploadFonts, bNested, pasteInExcel, 
     this.bUploadImage = bUploadImage;
     this.bUploadFonts = bUploadFonts;
     this.bNested = bNested;//для параграфов в таблицах
+	this.bUpdateCursorAfterPast = true; //для того, чтобы не сбрасывался селект и не обновлялся курсов после вставки текста в таблицу
     this.oFonts = {};
     this.oImages = {};
 	this.aContent = [];
@@ -2418,7 +2419,7 @@ PasteProcessor.prototype =
         if(bNeedRecalculate)
         {
             this.oRecalcDocument.Recalculate();
-            if (bNeedMoveCursor)
+            if (bNeedMoveCursor && this.bUpdateCursorAfterPast)
             {
                 this.oLogicDocument.MoveCursorRight(false, false, true);
             }
@@ -2596,6 +2597,15 @@ PasteProcessor.prototype =
 
 				oCellContent.InsertContent(oSelectedContent, NearPos);
 			}
+			// set select
+			var starCell = oTable.GetRow(arrSelectedCells[0].Row).GetCell(arrSelectedCells[0].Cell);
+			var startPos = starCell.Content.Content[0].GetDocumentPositionFromObject();
+			var len = arrSelectedCells.length - 1;
+			var endCell = oTable.GetRow(arrSelectedCells[len].Row).GetCell(arrSelectedCells[len].Cell);
+			len = endCell.Content.Content.length - 1;
+			var endPos = endCell.Content.Content[len].GetDocumentPositionFromObject();
+			oTable.SetContentSelection(startPos, endPos, 1, 0, 0);
+			this.bUpdateCursorAfterPast = false;
 		}
 		else
 		{
