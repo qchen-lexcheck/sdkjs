@@ -316,6 +316,27 @@
 			window['AscCommon'].g_specialPasteHelper.SpecialPasteButton_Hide();
 			ws.handlers.trigger("cleanCutData", true);
 
+			/*if (AscCommon.c_oAscClipboardDataFormat.Image & _formats) {
+				_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==";
+				var canvas = document.createElement('canvas')
+				canvas.width = 100
+				canvas.height = 100
+				var context = canvas.getContext('2d')
+				context.moveTo(0,0)
+				context.moveTo(10,10)
+
+
+
+				canvas.toBlob(function (blob_data) {
+					if (null !== blob_data) {
+						_clipboard.pushData(AscCommon.c_oAscClipboardDataFormat.Image, blob_data);
+					}
+				})
+
+
+				return;
+			}*/
+
 			if (wb.getCellEditMode())//text in cell
 			{
 				//only TEXT

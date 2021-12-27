@@ -54,7 +54,8 @@
 		Text        : 1,
 		Html        : 2,
 		Internal    : 4,
-		HtmlElement : 8
+		HtmlElement : 8,
+		Image       : 16
 	};
 	var c_oClipboardPastedFrom       = {
 		Word        : 0,
@@ -136,6 +137,10 @@
                 {
                     this.pushData(AscCommon.c_oAscClipboardDataFormat.Internal, "");
                 }
+				if (formats & AscCommon.c_oAscClipboardDataFormat.Image)
+				{
+					this.pushData(AscCommon.c_oAscClipboardDataFormat.Image, "");
+				}
 
                 clearTimeout(this.clearBufferTimerId);
                 this.clearBufferTimerId = -1;
@@ -160,7 +165,7 @@
 			else
 			{
 				this.LastCopyBinary = null;
-				this.checkCopy(AscCommon.c_oAscClipboardDataFormat.Text | AscCommon.c_oAscClipboardDataFormat.Html | AscCommon.c_oAscClipboardDataFormat.Internal);
+				this.checkCopy(AscCommon.c_oAscClipboardDataFormat.Text | AscCommon.c_oAscClipboardDataFormat.Html | AscCommon.c_oAscClipboardDataFormat.Internal | AscCommon.c_oAscClipboardDataFormat.Image);
 
 				setTimeout(function(){
 					//вызываю CommonDiv_End, поскольку на _private_onbeforecopy всегда делается CommonDiv_Start
@@ -190,7 +195,7 @@
 			else
 			{
 				this.LastCopyBinary = null;
-				this.checkCopy(AscCommon.c_oAscClipboardDataFormat.Text | AscCommon.c_oAscClipboardDataFormat.Html | AscCommon.c_oAscClipboardDataFormat.Internal);
+				this.checkCopy(AscCommon.c_oAscClipboardDataFormat.Text | AscCommon.c_oAscClipboardDataFormat.Html | AscCommon.c_oAscClipboardDataFormat.Internal | AscCommon.c_oAscClipboardDataFormat.Image);
 			}
 
 			this.Api.asc_SelectionCut();
@@ -436,6 +441,8 @@
 				if (AscBrowser.isIE && (type == 'text' || type == 'text/plain'))
 					_type = "Text";
 
+
+				//do not work image/png. tried blob, base64 str
 				try
 				{
 					_clipboard.setData(_type, _data);
@@ -443,6 +450,17 @@
 				catch (e)
 				{
 				}
+
+				//need iframe premissions - https://dev.chromium.org/Home/chromium-security/deprecating-permissions-in-cross-origin-iframes + не получилось запустить в FF
+				/*try {
+					navigator.clipboard.write([
+						new ClipboardItem({
+							'image/png': _data //blob
+						})
+					]);
+				} catch (error) {
+					console.error(error);
+				}*/
 			};
 
 			if (!AscBrowser.isIE)
@@ -889,6 +907,9 @@
 					break;
 				case AscCommon.c_oAscClipboardDataFormat.Internal:
 					_data_format = "text/x-custom";
+					break;
+				case AscCommon.c_oAscClipboardDataFormat.Image:
+					_data_format = "image/png";
 					break;
 				default:
 					break;
