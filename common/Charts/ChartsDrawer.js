@@ -3725,59 +3725,31 @@ CChartsDrawer.prototype =
 			}
 		};
 
-		var face;
+		var face, checkDrawForZero;
 		//front
 		face = this._calculatePathFace(point1, point5, point8, point4, true);
 		addPathToArr(this._isVisibleVerge3D(point52, point12, point42, val), face, 0);
 
 		//down
-		if(val === 0 && this.calcProp.type === c_oChartTypes.Bar)
-		{
-			face = this._calculatePathFace(point1, point2, point3, point4, true);
-			addPathToArr(true, face, 1);
-		}
-		else
-		{
-			face = this._calculatePathFace(point1, point2, point3, point4, true);
-			addPathToArr(this._isVisibleVerge3D(point42, point12, point22, val), face, 1);
-		}
+		checkDrawForZero = val === 0 && this.calcProp.type === c_oChartTypes.Bar;
+		face = this._calculatePathFace(point1, point2, point3, point4, true);
+		addPathToArr(this._isVisibleVerge3D(point42, point12, point22, val, false, checkDrawForZero), face, 1);
 
 
 		//left
-		if(val === 0 && this.calcProp.type === c_oChartTypes.HBar)
-		{
-			face = this._calculatePathFace(point1, point5, point6, point2, true);
-			addPathToArr(!isNotDrawDownVerge , face, 2);
-		}
-		else
-		{
-			face = this._calculatePathFace(point1, point5, point6, point2, true);
-			addPathToArr((!isNotDrawDownVerge && this._isVisibleVerge3D(point22, point12, point52, val)), face, 2);
-		}
+		checkDrawForZero = val === 0 && this.calcProp.type === c_oChartTypes.HBar;
+		face = this._calculatePathFace(point1, point5, point6, point2, true);
+		addPathToArr((!isNotDrawDownVerge && this._isVisibleVerge3D(point22, point12, point52, val, false, checkDrawForZero)), face, 2);
 
 		//right
-		if(val === 0 && this.calcProp.type === c_oChartTypes.HBar)
-		{
-			face = this._calculatePathFace(point4, point8, point7, point3, true);
-			addPathToArr(true, face, 3);
-		}
-		else
-		{
-			face = this._calculatePathFace(point4, point8, point7, point3, true);
-			addPathToArr(this._isVisibleVerge3D(point82, point42, point32, val), face, 3);
-		}
+		checkDrawForZero = val === 0 && this.calcProp.type === c_oChartTypes.HBar;
+		face = this._calculatePathFace(point4, point8, point7, point3, true);
+		addPathToArr(this._isVisibleVerge3D(point82, point42, point32, val, false, checkDrawForZero), face, 3);
 
 		//up
-		if(val === 0 && this.calcProp.type === c_oChartTypes.Bar)
-		{
-			face = this._calculatePathFace(point5, point6, point7, point8, true);
-			addPathToArr(true, face, 4);
-		}
-		else
-		{
-			face = this._calculatePathFace(point5, point6, point7, point8, true);
-			addPathToArr(this._isVisibleVerge3D(point62, point52, point82, val), face, 4);
-		}
+		checkDrawForZero = val === 0 && this.calcProp.type === c_oChartTypes.Bar;
+		face = this._calculatePathFace(point5, point6, point7, point8, true);
+		addPathToArr(this._isVisibleVerge3D(point62, point52, point82, val, false, checkDrawForZero), face, 4);
 
 		//unfront
 		face = this._calculatePathFace(point2, point6, point7, point3, true);
@@ -3857,8 +3829,13 @@ CChartsDrawer.prototype =
 		return pathId;
 	},
 	
-	_isVisibleVerge3D: function(k, n, m, val, cylinder)
+	_isVisibleVerge3D: function(k, n, m, val, cylinder, checkDrawForZero)
 	{
+		if (this.calcProp.subType === "stacked" && this.calcProp.subType === "stackedPer") {
+			if (checkDrawForZero) {
+				return true;
+			}
+		}
 		//roberts method - calculate normal
 		var aX = n.x * m.y - m.x * n.y;
 		var bY = - (k.x * m.y - m.x * k.y);
@@ -3885,12 +3862,38 @@ CChartsDrawer.prototype =
 				result = !result;
 		}
 
-		if ((_valAx.crossAx.crosses === AscFormat.CROSSES_MAX && val > 0) || 
-			(_valAx.crossAx.crosses === AscFormat.CROSSES_MIN && val < 0)) {		
-			result = !result;
-		} else if (_valAx.crossAx.crossesAt) {
-			if ((val > 0 && val < _valAx.crossAx.crossesAt) || (val < 0 && val > _valAx.crossAx.crossesAt)) {
-				result = !result;
+		if (!(this.calcProp.subType === "stacked") && !(this.calcProp.subType === "stackedPer")) {
+			if ((_valAx.crossAx.crosses === AscFormat.CROSSES_MAX && val >= 0) || 
+				(_valAx.crossAx.crosses === AscFormat.CROSSES_MIN && val <= 0)) {
+
+				if (this.calcProp.type === c_oChartTypes.Bar) {
+					result = (_valAx.crossAx.crosses === AscFormat.CROSSES_MAX && visible < 0) || 
+					(_valAx.crossAx.crosses === AscFormat.CROSSES_MIN && visible > 0);
+				} else if (this.calcProp.type === c_oChartTypes.HBar) {
+					result = (_valAx.crossAx.crosses === AscFormat.CROSSES_MAX && visible > 0) || 
+					(_valAx.crossAx.crosses === AscFormat.CROSSES_MIN && visible < 0);
+				}
+				if (_valAx.scaling.orientation === ORIENTATION_MIN_MAX) {
+					result = !result;
+				}
+
+			} else if (_valAx.crossAx.crossesAt) {
+
+				if ((val >= 0 && val < _valAx.crossAx.crossesAt) || (val <= 0 && val > _valAx.crossAx.crossesAt)) {
+					if (this.calcProp.type === c_oChartTypes.Bar) {
+						result = _valAx.crossAx.crossesAt > 0 && visible < 0 || _valAx.crossAx.crossesAt < 0 && visible > 0;
+					} else if (this.calcProp.type === c_oChartTypes.HBar) {
+						result = _valAx.crossAx.crossesAt > 0 && visible > 0 || _valAx.crossAx.crossesAt < 0 && visible < 0;
+					}
+					if (_valAx.scaling.orientation === ORIENTATION_MIN_MAX) {
+						result = !result;
+					}
+				}
+
+			} else {
+				if (checkDrawForZero) {
+					return true;
+				}
 			}
 		}
 
@@ -5797,14 +5800,14 @@ drawBarChart.prototype = {
 			}
 
 			startY = val === 0 ? nullPositionOX : startBlockPosition;
-			height = val === 0 ? val : startBlockPosition - endBlockPosition;
+			height = startBlockPosition - endBlockPosition;
 
 			if (this.valAx.scaling.orientation !== ORIENTATION_MIN_MAX) {
 				height = -height;
 			}
 		} else {
-			height = val === 0 ? val : nullPositionOX - this.cChartDrawer.getYPosition(val, this.valAx, null, true) * this.chartProp.pxToMM;
-			startY = val === 0 ? nullPositionOX : nullPositionOX;
+			height = nullPositionOX - this.cChartDrawer.getYPosition(val, this.valAx, null, true) * this.chartProp.pxToMM;
+			startY = nullPositionOX;
 		}
 		if (type === AscFormat.BAR_SHAPE_PYRAMID || type === AscFormat.BAR_SHAPE_PYRAMIDTOMAX ||
 			type === AscFormat.BAR_SHAPE_CONE || type === AscFormat.BAR_SHAPE_CONETOMAX) {
