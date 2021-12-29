@@ -300,7 +300,8 @@
 			"cell/model/DrawingObjects/Graphics.js",
 			"vendor/iscroll.js",
 			"common/Scrolls/mobileTouchManagerBase.js",
-			"cell/view/mobileTouch.js"
+			"cell/view/mobileTouch.js",
+			"common/osk/osk.js"
 		]
 	}
 }

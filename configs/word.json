@@ -273,7 +273,8 @@
 			"vendor/iscroll.js",
 			"common/Scrolls/mobileTouchManagerBase.js",
 			"word/Drawing/mobileTouchManager.js",
-			"word/Drawing/HtmlPage.js"
+			"word/Drawing/HtmlPage.js",
+			"common/osk/osk.js"
 		]
 	}
 }

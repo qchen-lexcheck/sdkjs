@@ -270,7 +270,8 @@
 			"common/libfont/rasterheap.js",
 			"common/libfont/glyphstring.js",
 			"common/libfont/manager.js",
-			"common/libfont/textmeasurer.js"
+			"common/libfont/textmeasurer.js",
+			"common/osk/osk.js"
 		]
 	}
 }
