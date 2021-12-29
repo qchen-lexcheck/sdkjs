@@ -7076,9 +7076,9 @@ var GLOBAL_PATH_COUNT = 0;
                             crosses_val_ax = cat_ax.crossesAt;
                     }
                     else { //ведем себя как в случае (cat_ax.crosses === AscFormat.CROSSES_AUTO_ZERO)
-                        if(arr_val[0] <= 0 && arr_val[arr_val.length - 1] >= 0)
+                        if(arr_val[0] <= 0 && arr_val[arr_val.length - 1] >= 0 && cat_ax.crossesAt === 0)
                             crosses_val_ax = 0;
-                        else if(arr_val[arr_val.length - 1] < 0)
+                        else if(arr_val[arr_val.length - 1] < 0 || cat_ax.crossesAt > 0)
                             crosses_val_ax = arr_val[arr_val.length - 1];
                         else
                             crosses_val_ax = arr_val[0];

@@ -6149,7 +6149,7 @@ drawBarChart.prototype = {
 					brush = options.brush;
 				}
 
-				t._drawBar3D(paths, pen, brush, k, options.val);
+				t._drawBar3D(paths, pen, brush, k, options.val, i);
 			}
 		};
 
@@ -6201,13 +6201,33 @@ drawBarChart.prototype = {
 		return {pen: pen, brush: brush, val: pt.val}
 	},
 
-	_drawBar3D: function (path, pen, brush, k, val) {
+	_drawBar3D: function (path, pen, brush, k, val, ser) {
 		//затемнение боковых сторон
 		//в excel всегда темные боковые стороны, лицевая и задняя стороны светлые
 		//TODO пересмотреть получения pen
 		if (null === pen || (null !== pen && null === pen.Fill) ||
 			(null !== pen && null !== pen.Fill && null === pen.Fill.fill)) {
 			pen = AscFormat.CreatePenFromParams(brush, undefined, undefined, undefined, undefined, 0.1);
+		}
+
+		if (this.chart.series[ser].invertIfNegative && val < 0) {
+			var invertPen = pen.createDuplicate();
+			var invertBrush = brush.createDuplicate();
+
+			invertBrush.fill.color.RGBA.R = 255;
+			invertBrush.fill.color.RGBA.G = 255;
+			invertBrush.fill.color.RGBA.B = 255;
+			invertBrush.fill.color.RGBA.A = 255;
+
+			var duplicateBrush = invertBrush.createDuplicate();
+			invertPen.setFill(duplicateBrush);
+			invertPen.Fill.fill.color.RGBA.R = 0;
+			invertPen.Fill.fill.color.RGBA.G = 0;
+			invertPen.Fill.fill.color.RGBA.B = 0;
+			invertPen.Fill.fill.color.RGBA.A = 255;
+
+			this.cChartDrawer.drawPath(path, invertPen, invertBrush);
+			return;
 		}
 
 		if (k !== 5 && k !== 0) {
