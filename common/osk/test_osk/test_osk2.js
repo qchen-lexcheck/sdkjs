@@ -16,9 +16,11 @@ function onResize() {
 		if (isAndroid) {
 			if (window.screen.height - 300 > window.visualViewport.height * window.visualViewport.scale) {
 				console.log('keyboard is opened');
+				document.getElementById('result').innerHTML = "keyboard is opened";
 				KeyboardIsOpened = true;
 			} else if (KeyboardIsOpened) {
 				console.log('keyboard is closed');
+				document.getElementById('result').innerHTML = "keyboard is closed";
 				KeyboardIsOpened = false;
 			}
 		} else {

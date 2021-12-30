@@ -41,100 +41,118 @@ function (window, undefined)
 	/** @constructor */
 	function CDetectOSK()
 	{
-		// this.isMobile = AscCommon.AscBrowser.isMobile;
-		this.isAndroid = AscCommon.AscBrowser.isAndroid;
-		// this.isIOS = AscCommon.AscBrowser.isAppleDevices && this.isMobile;
-		this.isKeyboardOpened = false;
-		this.ResizeTimerId = -1;
-		this.OrientationTimerId = -1;
-		// на ios пока берется не правильно (берется iframe, а нужно у родительсого окна)
-		this.DefaultScale = visualViewport.scale;
-		this.ScalePercent = (visualViewport.scale < 1) ? ( 1 - visualViewport.scale) : (visualViewport.scale > 1) ? (visualViewport.scale) : 1;
+		this.isIOS					= AscCommon.AscBrowser.isAppleDevices && AscCommon.AscBrowser.isMobile; // флаг, что это ios
+		this.isAndroid 				= AscCommon.AscBrowser.isAndroid; // флаг, что это android
+		this.isKeyboardOpened 		= false; // флаг открыта ли в текущий момент клавиатура
+		this.isChnWithKeyboard 		= false; // флаг, что смена ориентации экрана произошла с открытой клавиатурой
+		this.skipResize				= false; // флаг для пропуска событий resize
+		this.OrientationTimerId 	= -1; // таймер в течерии которого мы игнорируем события resize после смены ориентации экрана
+		this.BrowserToolbarHeight	= screen.availHeight - window.innerHeight;
 	};
 	
-	CDetectOSK.prototype.IsKeyboardOpened = function()
-	{
-		// работает с задержкой, поэтому возможно лучше просто ждать события или может даже выполнять функцию resize и в ней сделать вызов callback (если он есть или отправлять какой-то ивент)
-		return this.isKeyboardOpened;
+	CDetectOSK.prototype.asc_isKeyboardOpened = function() {
+		// функция возвращает true если клавиатура сейчас открыта (может работать не правильно если ещё не пришли события resize, при появлении/скрытии клавиатуры)
+		var coef;
+		if (this.isAndroid) {
+			coef = window.innerHeight / (screen.availHeight - this.BrowserToolbarHeight);
+			// если смена ориентации была с открытой клавиатурой, то при её закрытии coef должен увеличиться быть в пределах от 0.95 до 1.05
+			if (this.isChnWithKeyboard  && coef >= 0.95 && coef <= 1.05)
+				coef = 0.9;
+
+		} else {
+			coef = visualViewport.height * (document.documentElement.clientWidth / window.innerWidth) / document.documentElement.clientHeight;
+		}
+		if (coef < 0.95) {
+			console.log('keyboard is opened');
+			this.isKeyboardOpened = true;
+			return true;
+		} else {
+			console.log('keyboard is closed');
+			this.isKeyboardOpened = false;
+			return false;
+		}
 	};
 
-	visualViewport.addEventListener('resize', onResize, false);
+	window.addEventListener('orientationchange', function() {
+		// нужно отслеживать для android, чтобы правильно посчитать BrowserToolbarHeight для новой ориентации экрана
+		// из-за того окрыта ли клавиатура в момент смены ориентации мы по разному будем оценивать coef, который рассчитывается по запросу или при resize
+		AscCommon.CDetectOSK.isChnWithKeyboard = AscCommon.CDetectOSK.isKeyboardOpened;
+		console.log('AscCommon.CDetectOSK.isChnWithKeyboard = ' + AscCommon.CDetectOSK.isChnWithKeyboard);
+		if (AscCommon.CDetectOSK.OrientationTimerId != -1)
+			clearTimeout(AscCommon.CDetectOSK.OrientationTimerId);
+	
+		AscCommon.CDetectOSK.skipResize = true;
+		AscCommon.CDetectOSK.OrientationTimerId = setTimeout(function() {
+			// пропускаем все ресайзы, которые придут при изменении ориентации, так как клавиатуру они не закрывают и не открывают
+			// но на одном из резайзов нужно будет пересчитать BrowserToolbarHeight
+			AscCommon.CDetectOSK.skipResize = false;
+		}, 1000);
+	}, false);
+	
+	window.addEventListener('resize', function() {
+		// это нужно для отслеживания сокрытия клавиатуры на android (чтобы при смене ориентации экрана мы знали открыта ли она сейчас)
+		// нужно чтобы мы понимали, как рассматривать coef
+		// без этого события будет проблема если: меняем ориентацию экрана с открытой клавиатурой, дальше её скрываем и не вызываем ни разу проверку на наличие клавиатуры опять меняем ориентацию экрана
+		// по идее можно не делать проверку на android, так как в ios оно не приходит, но на всякий случай лучше добавить
+		if (AscCommon.CDetectOSK.isAndroid) {
+			if (AscCommon.CDetectOSK.skipResize) {
+				// здесь уже можно пересчитать BrowserToolbarHeight
+				AscCommon.CDetectOSK.BrowserToolbarHeight = screen.availHeight - window.innerHeight;
+			} else {
+				var coef = window.innerHeight / (screen.availHeight - AscCommon.CDetectOSK.BrowserToolbarHeight);
+				// если смена ориентации была с открытой клавиатурой, то при её закрытии coef должен увеличиться быть в пределах от 0.95 до 1.05
+				if (AscCommon.CDetectOSK.isChnWithKeyboard && coef >= 0.95 && coef < 1.05)
+					coef = 0.9;
+				
+				if (coef < 0.95) {
+					console.log('keyboard is opened');
+					this.isKeyboardOpened = true;
+				} else {
+					console.log('keyboard is closed');
+					this.isKeyboardOpened = false;
+				}
+			}
+		}
+	}, false);
+
+	visualViewport.addEventListener('resize', function() {
+		// пока нет прокидки этого события (надо подумать как его прокинуть из родительского окна)
+		// это событие отслеживаем для ios (так как не приходит resize у window)
+		// можно обойтись без него и просто рассчитывать по запросу
+		if (!AscCommon.CDetectOSK.isAndroid && !AscCommon.CDetectOSK.skipResize) {
+			var coef = visualViewport.height * (document.documentElement.clientWidth / window.innerWidth) / document.documentElement.clientHeight;
+			if (coef < 0.95) {
+				console.log('keyboard is opened');
+				AscCommon.CDetectOSK.isKeyboardOpened = true;
+			} else {
+				console.log('keyboard is closed');
+				AscCommon.CDetectOSK.isKeyboardOpened = false;
+			}
+		}
+	}, false);
 
 	// в ios не приходит события window.onresize и visualViewport, а также нет доступа к родительскому окну, а окно iframe не изменяется.
 	// поэтому приходится запрашивать из web-apps это событие с его размерами (надо бы подумать над тем как прокинуть эти данные сюда)
-	if (!AscCommon.AscBrowser.isAndroid)
-	{
-		window.addEventListener("message", function(msg){
-			if (AscCommon.CDetectOSK.ResizeTimerId != -1)
-				clearTimeout(AscCommon.CDetectOSK.ResizeTimerId);
-		
-			var obj = JSON.parse(msg.data);
-			var osk = AscCommon.CDetectOSK;
-			AscCommon.CDetectOSK.ResizeTimerId = setTimeout( function() 
-			{
-				var coef = 1;
-				var height = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-
-				if (osk.DefaultScale == 1) {
-					coef = obj.height * obj.scale / height;
-				}
-				else {
-					coef = obj.height * ( obj.scale + ( (obj.scale * 100) / (osk.DefaultScale * 100) ) * osk.ScalePercent) / height;
-				}
-
+	// по идее можно и без события обойтись, но доступа к параметрам родительского окна тоже нет
+	if (!AscCommon.AscBrowser.isAndroid) {
+		window.addEventListener("message", function(msg) {	
+			var sizes = JSON.parse(msg.data);
+			if (!skipResize) {
+				var coef = sizes.VVheight * sizes.Zoom / sizes.Dheight;
 				if (coef < 0.95) {
-					console.log('keyboar is opened');
-					osk.isKeyboardOpened = true;
-				} else if (osk.isKeyboardOpened) {
-					console.log('keyboad is closed');
-					osk.isKeyboardOpened = false;
+					console.log('keyboard is opened');
+					AscCommon.CDetectOSK.isKeyboardOpened = true;
+				} else {
+					console.log('keyboard is closed');
+					AscCommon.CDetectOSK.isKeyboardOpened = false;
 				}
-			}, 700);
+			}	
 		}, false);
 	}
-	
-	//нужно учитывать дефолтный scale (так как он может отличаться от 1)
-	// либо можно посчитать сколько процентов ему не хватает до 1 и это число (в процентах) каждый раз прибавлять к scale при расчетах
-
-	// можно и без таймаута, но тогда приходят несколько событий при смене ориентации и в антройде несколько ресайзов при открытии клавиатуры
-	function onResize() {
-		if (AscCommon.CDetectOSK.ResizeTimerId != -1)
-			clearTimeout(AscCommon.CDetectOSK.ResizeTimerId);
-
-		var osk = AscCommon.CDetectOSK;
-		AscCommon.CDetectOSK.ResizeTimerId = setTimeout( function() 
-		{
-			var coef = 1;
-			var height = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-			if (osk.isAndroid) {
-				if (window.screen.height - 300 > window.visualViewport.height * window.visualViewport.scale) {
-					console.log('keyboar is opened');
-					osk.isKeyboardOpened = true;
-				} else if (osk.isKeyboardOpened) {
-					console.log('keyboad is closed');
-					osk.isKeyboardOpened = false;
-				}
-			} else {
-				if (osk.DefaultScale == 1) {
-					coef = visualViewport.height * visualViewport.scale / height;
-				}
-				else {
-					coef = visualViewport.height * ( visualViewport.scale + ( (visualViewport.scale * 100) / (osk.DefaultScale * 100) ) * osk.ScalePercent) / height;
-				}
-
-				if (coef < 0.95) {
-					console.log('keyboar is opened');
-					osk.isKeyboardOpened = true;
-				} else if (osk.isKeyboardOpened) {
-					console.log('keyboad is closed');
-					osk.isKeyboardOpened = false;
-				}
-			}
-			
-		}, 400);
-	};
 
 	//--------------------------------------------------------export----------------------------------------------------
 	window['AscCommon'] = window['AscCommon'] || {};
 	window["AscCommon"].CDetectOSK = new CDetectOSK();
+	// var prot = CDetectOSK.prototype;
+	// prot["asc_isKeyboardOpened"] = prot.asc_isKeyboardOpened;
 })(window);
