@@ -261,7 +261,8 @@
 			"common/Drawings/Format/DrawingContent.js",
 			"common/plugins.js",
 			
-			"common/Native/native_graphics.js"
+			"common/Native/native_graphics.js",
+			"common/osk/osk.js"
 		],
 		"desktop": {
 			"min": [
