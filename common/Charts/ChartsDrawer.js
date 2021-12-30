@@ -1864,7 +1864,11 @@ CChartsDrawer.prototype =
 		} else {
 			//было следующее условие - isOx || c_oChartTypes.HBar === this.calcProp.type
 			if (axis.axPos === window['AscFormat'].AX_POS_B || axis.axPos === window['AscFormat'].AX_POS_T) {
-				step = this._getStep(firstDegree.val + (firstDegree.val / 10) * 3);
+				if (axisMin && axisMax) {
+					step = this._getStep(firstDegree.val + (firstDegree.val / 10) * 3);
+				} else {
+					step = this._getStep(firstDegree.val + firstDegree.val / 10);
+				}
 			} else {
 				step = this._getStep(firstDegree.val);
 			}
@@ -1926,6 +1930,13 @@ CChartsDrawer.prototype =
 		var manualMax = props.manualMax;
 		var newStep = props.step;
 
+		if ((manualMax && manualMax < res[res.length - 1]) && (manualMin !== 0)) {
+			manualMin = manualMax - res[res.length - 1];
+			return this._getArrayDataValues(newStep, axisMin, axisMax, manualMin, manualMax);
+		} else if (manualMin) {
+			manualMax = res[res.length - 1] - (Math.abs(res[0]) - Math.abs(manualMin));
+			return this._getArrayDataValues(newStep, axisMin, axisMax, manualMin, manualMax);
+		}
 
 		if (isOxAxis) {
 
