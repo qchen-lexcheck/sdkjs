@@ -1969,6 +1969,10 @@ CChartsDrawer.prototype =
 			}
 		}
 
+		if (manualMax && (manualMax < res[res.length - 1])) {
+			res.splice(res.length - 1, 1);
+			res.push(manualMax);
+		}
 
 		return res;
 	},
