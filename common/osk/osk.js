@@ -137,7 +137,7 @@ function (window, undefined)
 	if (!AscCommon.AscBrowser.isAndroid) {
 		window.addEventListener("message", function(msg) {	
 			var sizes = JSON.parse(msg.data);
-			if (!skipResize) {
+			if (!AscCommon.CDetectOSK.skipResize) {
 				var coef = sizes.VVheight * sizes.Zoom / sizes.Dheight;
 				if (coef < 0.95) {
 					console.log('keyboard is opened');
