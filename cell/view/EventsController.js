@@ -1238,6 +1238,10 @@
 					return true;
 				}
 
+				if (this.view.Api.isMobileVersion && this.view.Api.wb && this.view.Api.wb.isProtectActiveCell()) {
+					return;
+				}
+
 				// При нажатии символа, фокус не ставим и очищаем содержимое ячейки
 				var enterOptions = new AscCommonExcel.CEditorEnterOptions();
 				enterOptions.newText = '';
