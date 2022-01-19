@@ -1897,7 +1897,7 @@ CChartsDrawer.prototype =
 				manualMin: manualMin,
 				manualMax: manualMax
 			};
-			arrayValues = this._correctDataValuesFromHeight(props, chartSpace, isOxAxis);
+			arrayValues = this._correctDataValuesFromHeight(props, chartSpace, isOxAxis, isScatter);
 		}
 
 		//TODO для 3d диаграмм. пересмотреть!
@@ -1923,13 +1923,16 @@ CChartsDrawer.prototype =
 		return arrayValues;
 	},
 
-	_correctDataValuesFromHeight: function (props, chartSpace, isOxAxis) {
+	_correctDataValuesFromHeight: function (props, chartSpace, isOxAxis, isScatter) {
 		var res = props.arrayValues;
-		var heightCanvas, trueHeight;
+		var heightCanvas, trueHeight, widthCanvas, plotAreaWidth, equality;
 		var margins = this._calculateMarginsChart(chartSpace, true);
+
 		if (isOxAxis) {
-			heightCanvas = chartSpace.extX * this.calcProp.pxToMM;
-			trueHeight = heightCanvas - margins.left - margins.right;
+			//widthCanvas = chartSpace.extX * this.calcProp.pxToMM - margins.left - margins.right;
+			plotAreaWidth = chartSpace.getChartSizes().w * this.calcProp.pxToMM;
+			//equality = widthCanvas / plotAreaWidth < 6 / 5;
+			trueHeight = plotAreaWidth;
 		} else {
 			heightCanvas = chartSpace.extY * this.calcProp.pxToMM;
 			trueHeight = heightCanvas - margins.top - margins.bottom;
@@ -1963,27 +1966,45 @@ CChartsDrawer.prototype =
 			 heightGrid = Math.round((trueHeight / (res.length - 1)));
 			 }*/
 		} else {
-			var limitArr = [0, 0, 32, 26, 24, 22, 21, 19, 18, 17, 16];
-			var typeFactor;
 			if (isOxAxis) {
-				typeFactor = 2.5;
-			} else {
-				typeFactor = 1;
-			}
-			var limit = limitArr[res.length - 1];
-			var heightGrid = Math.round((trueHeight / (res.length - 1)));
-			while (heightGrid <= limit * typeFactor) {
-				var firstDegreeStep = this._getFirstDegree(newStep);
-				var tempStep = this._getNextStep(firstDegreeStep.val);
-				newStep = tempStep * firstDegreeStep.numPow;
-				res = this._getArrayDataValues(newStep, axisMin, axisMax, manualMin, manualMax);
-
-				if (res.length <= 2) {
-					break;
+				var limitArr;
+				if (isScatter) {
+					limitArr = [0, 0, 46, 46, 46, 46, 47, 46, 46, 46, 43];
+				} else {
+					limitArr = [0, 0, 32, 26, 24, 22, 21, 19, 18, 17, 16];
 				}
+				var limit = limitArr[res.length - 1];
+				var heightGrid = Math.round((trueHeight / (res.length - 1)));
+				while (heightGrid <= limit) {
+					var firstDegreeStep = this._getFirstDegree(newStep);
+					var tempStep = this._getNextStep(firstDegreeStep.val);
+					newStep = tempStep * firstDegreeStep.numPow;
+					res = this._getArrayDataValues(newStep, axisMin, axisMax, manualMin, manualMax);
 
-				limit = limitArr[res.length - 1];
-				heightGrid = Math.round((trueHeight / (res.length - 1)));
+					if (res.length <= 2) {
+						break;
+					}
+
+					limit = limitArr[res.length - 1];
+					heightGrid = Math.round((trueHeight / (res.length - 1)));
+				}
+			} else {
+				var limitArr = [0, 0, 32, 26, 24, 22, 21, 19, 18, 17, 16];
+				var limit = limitArr[res.length - 1];
+				var heightGrid = Math.round((trueHeight / (res.length - 1)));
+				while (heightGrid <= limit) {
+					var firstDegreeStep = this._getFirstDegree(newStep);
+					var tempStep = this._getNextStep(firstDegreeStep.val);
+					newStep = tempStep * firstDegreeStep.numPow;
+					res = this._getArrayDataValues(newStep, axisMin, axisMax, manualMin, manualMax);
+
+					if (res.length <= 2) {
+						break;
+					}
+
+					limit = limitArr[res.length - 1];
+					heightGrid = Math.round((trueHeight / (res.length - 1)));
+				}
 			}
 		}
 
