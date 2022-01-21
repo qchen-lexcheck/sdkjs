@@ -76,6 +76,8 @@ var numFormat_DigitDrop = 104;
 var numFormat_Plus = 105;
 var numFormat_Minus = 106;
 var numFormat_ThousandText = 107;
+var numFormat_Gannen = 108;
+var numFormat_JapanYearsGannen = 109;
 
 var FormatStates = {Decimal: 1, Frac: 2, Scientific: 3, Slash: 4, SlashFrac: 5};
 var SignType = {Negative: 1, Null:2, Positive: 3};
@@ -86,7 +88,13 @@ var gc_nMaxMantissa = Math.pow(10, gc_nMaxDigCount);
 var gc_aTimeFormats = ['[$-F400]h:mm:ss AM/PM', 'h:mm;@', 'h:mm AM/PM;@', 'h:mm:ss;@', 'h:mm:ss AM/PM;@', 'mm:ss.0;@',
 	'[h]:mm:ss;@'];
 var gc_aFractionFormats = ['# ?/?', '# ??/??', '# ???/???', '# ?/2', '# ?/4', '# ?/8', '# ??/16', '# ?/10', '# ??/100'];
-
+var gc_aJapanEras = [
+	["M", "明", "明治", 1868],
+	["T", "大", "大正", 1912],
+	["S", "昭", "昭和", 1926],
+	["H", "平", "平成", 1989],
+	["R", "令", "令和", 2019]
+];
 var NumComporationOperators =
 {
 	equal: 1,
@@ -255,7 +263,8 @@ function FormatObjBracket(sData)
                 else if("yellow" == sLowerColor)
                     this.color = 0xffff00;
                 else if("y" == first || "m" == first || "d" == first || "h" == first || "s" == first ||
-                    "Y" == first || "M" == first || "D" == first || "H" == first || "S" == first)
+                    "Y" == first || "M" == first || "D" == first || "H" == first || "S" == first ||
+					"g" == first || "G" == first || "e" == first || "E" == first)
                 {
                     var bSame = true;
                     var nCount = 1;
@@ -282,6 +291,10 @@ function FormatObjBracket(sData)
                             case "h": this.dataObj = new FormatObjDateVal(numFormat_Hour, nCount, true);break;
                             case "S":
                             case "s": this.dataObj = new FormatObjDateVal(numFormat_Second, nCount, true);break;
+							case "G":
+                            case "g": this.dataObj = new FormatObjDateVal(numFormat_Gannen, nCount, true);break;
+							case "E":
+                            case "e": this.dataObj = new FormatObjDateVal(numFormat_JapanYearsGannen, nCount, true);break;
                         }
                     }
                 }
@@ -864,7 +877,8 @@ NumFormat.prototype =
                 this._addToFormat(numFormat_General);
                 this._skip(sGeneral.length - 1);
             }
-            else if("E" == next || "e" == next)
+			// Конфликты с японской эрой и экспонентой
+            /*else if("E" == next || "e" == next)
             {
                 var nextnext = this._readChar();
                 if(this.EOF != nextnext && "+" == nextnext || "-" == nextnext)
@@ -872,7 +886,15 @@ NumFormat.prototype =
                     var sign = ("+" == nextnext) ? SignType.Positive : SignType.Negative;
                     this._addToFormat2(new FormatObjScientific(next, "", sign));
                 }
-            }
+            }*/
+			else if ("e" == next/* || "E" == next*/)
+			{
+				this._addToFormat2(new FormatObjDateVal(numFormat_JapanYearsGannen, 1, false));
+			}
+			else if ("g" == next/* || "G" == next*/)
+			{
+				this._addToFormat2(new FormatObjDateVal(numFormat_Gannen, 1, false));
+			}
             else if("*" == next)
             {
                 var nextnext = this._readChar();
@@ -956,6 +978,14 @@ NumFormat.prototype =
 			else if("S" == next || "s" == next)
 			{
 				this._addToFormat2(new FormatObjDateVal(numFormat_Second, 1, false));
+			}
+			else if ("e" == next/* || "E" == next*/)
+			{
+				this._addToFormat2(new FormatObjDateVal(numFormat_JapanYearsGannen, 1, false));
+			}
+			else if ("g" == next/* || "G" == next*/)
+			{
+				this._addToFormat2(new FormatObjDateVal(numFormat_Gannen, 1, false));
 			}
 			else if ("A" == next || "a" == next) {
 				this._ReadAmPm(next);
@@ -1043,7 +1073,8 @@ NumFormat.prototype =
                     }
                 }
             }
-            else if(numFormat_Year == item.type || numFormat_MonthMinute == item.type || numFormat_Month == item.type || numFormat_Day == item.type || numFormat_Hour == item.type || numFormat_Minute == item.type || numFormat_Second == item.type || numFormat_Thousand == item.type)
+            else if(numFormat_Year == item.type || numFormat_MonthMinute == item.type || numFormat_Month == item.type || numFormat_Day == item.type || numFormat_Hour == item.type || numFormat_Minute == item.type || numFormat_Second == item.type || numFormat_Thousand == item.type ||
+				numFormat_Gannen == item.type || numFormat_JapanYearsGannen == item.type)
             {
                 //Собираем в одно целое последовательности hhh
                 var nStartType = item.type;
@@ -1959,6 +1990,9 @@ NumFormat.prototype =
                 //случай ".00"
                 bNoDecFormat = true;
             }
+
+			var oCurrentEra;
+
             var hasSign = false;
             var nReadState = FormatStates.Decimal;
             var nFormatLength = this.aRawFormat.length;    
@@ -2082,6 +2116,54 @@ NumFormat.prototype =
 				else if(numFormat_TimeSeparator == item.type)
                 {
                     oCurText.text += cultureInfo.TimeSeparator;
+				}
+				else if(numFormat_Gannen == item.type)
+				{
+					if (item.val != null && oParsedNumber.dec != null)
+					{
+						if (oParsedNumber.dec <= 4594) {
+							oCurrentEra = gc_aJapanEras[0];
+						}
+						else if (oParsedNumber.dec <= 9855) {
+							oCurrentEra = gc_aJapanEras[1];
+						}
+						else if (oParsedNumber.dec <= 32515) {
+							oCurrentEra = gc_aJapanEras[2];
+						}
+						else if (oParsedNumber.dec <= 43585) {
+							oCurrentEra = gc_aJapanEras[3];
+						}
+						else if (oParsedNumber.dec >= 43586) {
+							oCurrentEra = gc_aJapanEras[4];
+						}
+						if (oCurrentEra != null)
+						{
+							if(item.val == 1) {
+								oCurText.text += oCurrentEra[0];
+							}
+							else if(item.val == 2) {
+								oCurText.text += oCurrentEra[1];
+							}
+							else if(item.val >= 3) {
+								oCurText.text += oCurrentEra[2];
+							}
+						}
+					}
+				}
+				else if(numFormat_JapanYearsGannen == item.type)
+				{
+					if (oCurrentEra != null)
+					{
+						if(item.val == 1)
+						{
+							oCurText.text += (oParsedNumber.date.year - oCurrentEra[3] + 1);
+						}
+						else if(item.val >= 2)
+						{
+							var nYear = oParsedNumber.date.year - oCurrentEra[3] + 1;
+							oCurText.text += (nYear < 10) ? nYear : "0"+nYear;
+						}
+					}
 				}
                 else if(numFormat_Year == item.type)
                 {
@@ -2212,7 +2294,7 @@ NumFormat.prototype =
 					} else {
 						oCurText.text += ' ';
 					}
-				}
+				}	
             }
 
 			if (true == this.bAddMinusIfNes && SignType.Negative == oParsedNumber.sign && !hasSign) {
@@ -2261,6 +2343,9 @@ NumFormat.prototype =
 		var hour;
 		var minute;
 		var second;
+		// Пока не известно в какиъ LocaleFormatSymbol их хранить, поэтому пока пусть всегда будут такие
+		var gannen = 'g';
+		var era = 'e';
 		if (useLocaleFormat) {
 			sGeneral = LocaleFormatSymbol['general'];
 			DecimalSeparator = g_oDefaultCultureInfo.NumberDecimalSeparator;
@@ -2483,6 +2568,18 @@ NumFormat.prototype =
                 for(var j = 0; j < item.val; ++j)
                     res += second;
             }
+			else if(numFormat_Gannen == item.type)
+			{
+				var nIndex = (item.val > 3) ? 3 : item.val;
+				for(var j = 0; j < nIndex; ++j)
+					res += gannen;
+			}
+			else if(numFormat_JapanYearsGannen == item.type)
+			{
+				var nIndex = (item.val > 2) ? 2 : item.val;
+				for(var j = 0; j < nIndex; ++j)
+					res += era;
+			}
             else if(numFormat_AmPm == item.type)
                 res += "AM/PM";
             else if(numFormat_Milliseconds == item.type)
@@ -2770,6 +2867,7 @@ CellFormat.prototype =
 	},
     format : function(number, nValType, dDigitsCount, bChart, cultureInfo, opt_withoutCache, opt_forceNull)
     {
+		//opt_withoutCache = true;
         var res = null;
         if (null == bChart)
             bChart = false;
