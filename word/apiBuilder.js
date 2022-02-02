@@ -7068,8 +7068,8 @@
 		if (!oParent)
 			return null;
 
-		var oRunIndex = oParent.Content.indexOf(this.Run);
-		for (var nElm = oRunIndex + 1; nElm < oParent.Content.length - 1; nElm++)
+		var nRunIndex = this.Run.GetPosInParent();
+		for (var nElm = nRunIndex + 1; nElm < oParent.Content.length - 1; nElm++)
 		{
 			if (oParent.Content[nElm] && oParent.Content[nElm].IsRun && oParent.Content[nElm].IsRun() === true)
 				return new ApiRun(oParent.Content[nElm]);
@@ -7089,8 +7089,8 @@
 		if (!oParent)
 			return null;
 
-		var oRunIndex = oParent.Content.indexOf(this.Run);
-		for (var nElm = oRunIndex - 1; nElm > - 1; nElm--)
+		var nRunIndex = this.Run.GetPosInParent();
+		for (var nElm = nRunIndex - 1; nElm > - 1; nElm--)
 		{
 			if (oParent.Content[nElm] && oParent.Content[nElm].IsRun && oParent.Content[nElm].IsRun() === true)
 				return new ApiRun(oParent.Content[nElm]);
