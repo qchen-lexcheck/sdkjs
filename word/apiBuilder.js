@@ -7060,36 +7060,42 @@
 	 * Returns the next run if exists.
 	 * @memberof ApiRun
 	 * @typeofeditors ["CDE"]
-	 * @return {ApiRun | null} - returns null if next run doesn't exist.
+	 * @return {?ApiRun} - returns null if next run doesn't exist.
 	 */
 	ApiRun.prototype.GetNext = function()
 	{
 		var oParent = this.Run.Parent || this.Run.Paragraph;
-		var oRunType = this.Run.Get_Type();
 		if (!oParent)
 			return null;
 
 		var oRunIndex = oParent.Content.indexOf(this.Run);
-		if (oParent.Content[oRunIndex + 1] && oParent.Content[oRunIndex + 1].Type === oRunType && oRunIndex + 1 !== oParent.Content.length - 1)
-			return new ApiRun(oParent.Content[oRunIndex + 1]);
+		for (var nElm = oRunIndex + 1; nElm < oParent.Content.length - 1; nElm++)
+		{
+			if (oParent.Content[nElm] && oParent.Content[nElm].IsRun && oParent.Content[nElm].IsRun() === true)
+				return new ApiRun(oParent.Content[nElm]);
+		}
+		
 		return null;
 	};
 	/**
 	 * Returns the previous run if exists.
 	 * @memberof ApiRun
 	 * @typeofeditors ["CDE"]
-	 * @return {ApiRun | null} - returns null if previous run doesn't exist.
+	 * @return {?ApiRun} - returns null if previous run doesn't exist.
 	 */
 	ApiRun.prototype.GetPrevious = function()
 	{
 		var oParent = this.Run.Parent || this.Run.Paragraph;
-		var oRunType = this.Run.Get_Type();
 		if (!oParent)
 			return null;
 
 		var oRunIndex = oParent.Content.indexOf(this.Run);
-		if (oParent.Content[oRunIndex - 1] && oParent.Content[oRunIndex - 1].Type === oRunType && oRunIndex - 1 !== oParent.Content.length - 1)
-			return new ApiRun(oParent.Content[oRunIndex - 1]);
+		for (var nElm = oRunIndex - 1; nElm > - 1; nElm--)
+		{
+			if (oParent.Content[nElm] && oParent.Content[nElm].IsRun && oParent.Content[nElm].IsRun() === true)
+				return new ApiRun(oParent.Content[nElm]);
+		}
+
 		return null;
 	};
 	//------------------------------------------------------------------------------------------------------------------
@@ -13502,6 +13508,8 @@
 	ApiRun.prototype["SetUnderline"]                 = ApiRun.prototype.SetUnderline;
 	ApiRun.prototype["SetVertAlign"]                 = ApiRun.prototype.SetVertAlign;
 	ApiRun.prototype["WrapInMailMergeField"]         = ApiRun.prototype.WrapInMailMergeField;
+	ApiRun.prototype["GetNext"]                      = ApiRun.prototype.GetNext;
+	ApiRun.prototype["GetPrevious"]                  = ApiRun.prototype.GetPrevious;
 
 	ApiHyperlink.prototype["GetClassType"]           = ApiHyperlink.prototype.GetClassType;
 	ApiHyperlink.prototype["SetLink"]                = ApiHyperlink.prototype.SetLink;
