@@ -3992,6 +3992,11 @@ Paragraph.prototype.Remove = function(nCount, isRemoveWholeElement, bRemoveOnlyS
 
 				this.CurPos.ContentPos = ContentPos;
 				this.Content[ContentPos].MoveCursorToStartPos();
+
+				var oCC = this.AddContentControl(c_oAscSdtLevelType.Inline);
+				oCC.ApplyContentControlEquationPr();
+				oCC.SelectContentControl();
+
 				this.Correct_ContentPos2();
 			}
 			else
