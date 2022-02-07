@@ -208,7 +208,7 @@ CChartsDrawer.prototype =
 		var newChart;
 		for (var i = 0; i < chartSpace.chart.plotArea.charts.length; i++) {
 			var chart = chartSpace.chart.plotArea.charts[i];
-			switch (this._getChartType(chart)) {
+			switch (c_oChartTypes.Radar) {//(this._getChartType(chart)) {
 				case c_oChartTypes.Bar: {
 					newChart = new drawBarChart(chart, this);
 					break;
@@ -808,9 +808,34 @@ CChartsDrawer.prototype =
 
 		return {x: x, y: y};
 	},
-	
-	
-	
+
+	_calculatePositionLabelsCatAxForRadar: function () {
+		var chartProp = this.calcProp;
+
+		var trueWidth = chartProp.trueWidth;
+		var trueHeight = chartProp.trueHeight;
+		var xCenter = (chartProp.chartGutter._left + trueWidth / 2) / chartProp.pxToMM;
+		var yCenter = (chartProp.chartGutter._top + trueHeight / 2) / chartProp.pxToMM;
+
+		var points = [];
+
+		var seria = chartProp.series;
+		var numChache = this.getNumCache(seria[0].val);
+
+		var angle = Math.PI * 2 / numChache.ptCount;
+		var radius = trueHeight / 2 / chartProp.pxToMM;
+		var startAngle = (Math.PI / 2) * 3;
+		var x, y;
+
+		for (var i = 0; i < numChache.ptCount; i++) {
+			x = xCenter + radius * Math.cos(startAngle);
+			y = yCenter + radius * Math.sin(startAngle);
+			points.push({ x: x, y: y });
+			startAngle += angle;
+		}
+
+		return points;
+	},
 	//****calculate margins****
 	_calculateMarginsChart: function (chartSpace, dNotPutResult) {
 		this.calcProp.chartGutter = {};
@@ -14499,7 +14524,7 @@ axisChart.prototype = {
 	
 			return pathId;
 		}
-
+		var points;
 		if (this.cChartDrawer.nDimensionCount === 3) {
 			var z;
 			if (this.axisType === AscDFH.historyitem_type_ValAx) {
@@ -14516,14 +14541,24 @@ axisChart.prototype = {
 			y1 = convertResult.y / this.chartProp.pxToMM;
 
 		}
-
-		if (this.axis.axPos === window['AscFormat'].AX_POS_L || this.axis.axPos === window['AscFormat'].AX_POS_R) {
-			path.moveTo(x1 * pathW, y1 * pathH);
-			path.lnTo(x * pathW, y * pathH);
-		} else {
-			path.moveTo(x * pathW, y * pathH);
-			path.lnTo(x1 * pathW, y1 * pathH);
+		points = this.cChartDrawer._calculatePositionLabelsCatAxForRadar();
+		if (points && this.axisType === AscDFH.historyitem_type_CatAx) {
+			for (var i = 0; i < points.length; i++) {
+				if (i === 0) {
+					path.moveTo(points[i].x * pathW, points[i].y * pathH);
+				} else {
+					path.lnTo(points[i].x * pathW, points[i].y * pathH);
+				}
+			}
+			path.lnTo(points[0].x * pathW, points[0].y * pathH);
 		}
+		// if (this.axis.axPos === window['AscFormat'].AX_POS_L || this.axis.axPos === window['AscFormat'].AX_POS_R) {
+		// 	path.moveTo(x1 * pathW, y1 * pathH);
+		// 	path.lnTo(x * pathW, y * pathH);
+		// } else {
+		// 	path.moveTo(x * pathW, y * pathH);
+		// 	path.lnTo(x1 * pathW, y1 * pathH);
+		// }
 
 		return pathId;
 	},
