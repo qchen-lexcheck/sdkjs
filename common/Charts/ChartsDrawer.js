@@ -208,7 +208,7 @@ CChartsDrawer.prototype =
 		var newChart;
 		for (var i = 0; i < chartSpace.chart.plotArea.charts.length; i++) {
 			var chart = chartSpace.chart.plotArea.charts[i];
-			switch (c_oChartTypes.Radar) {//(this._getChartType(chart)) {
+			switch (this._getChartType(chart)) {
 				case c_oChartTypes.Bar: {
 					newChart = new drawBarChart(chart, this);
 					break;
