@@ -569,7 +569,8 @@ CChartsDrawer.prototype =
 					break;
 				}
 				case AscDFH.historyitem_type_CatAx: {
-					if (this.calcProp.type === c_oChartTypes.Radar) {
+					if ((obj.chart && obj.chart.chart && obj.chart.chart.plotArea && obj.chart.chart.plotArea.chart) &&
+						(obj.chart.chart.plotArea.chart.getObjectType() === AscDFH.historyitem_type_RadarChart)) {
 						pos = this._calculatePositionLabelsCatAxForRadar(idx);
 					}
 					break;
