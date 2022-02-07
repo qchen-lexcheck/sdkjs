@@ -549,7 +549,7 @@ CChartsDrawer.prototype =
 	},
 
 	//****positions text labels****
-	recalculatePositionText: function (obj) {
+	recalculatePositionText: function (obj, idx) {
 		var pos;
 
 		if (!this.cChartSpace.bEmptySeries) {
@@ -560,7 +560,11 @@ CChartsDrawer.prototype =
 					break;
 				}
 				case AscDFH.historyitem_type_Title: {
-					pos = this._calculatePositionTitle(obj);
+					if (obj.parent.getObjectType() === AscDFH.historyitem_type_CatAx) {
+						pos = this._calculatePositionLabelsCatAxForRadar(idx);
+					} else {
+						pos = this._calculatePositionTitle(obj);
+					}
 					break;
 				}
 				case AscDFH.historyitem_type_ValAx:
@@ -809,7 +813,7 @@ CChartsDrawer.prototype =
 		return {x: x, y: y};
 	},
 
-	_calculatePositionLabelsCatAxForRadar: function () {
+	_calculatePositionLabelsCatAxForRadar: function (idx) {
 		var chartProp = this.calcProp;
 
 		var trueWidth = chartProp.trueWidth;
@@ -817,24 +821,17 @@ CChartsDrawer.prototype =
 		var xCenter = (chartProp.chartGutter._left + trueWidth / 2) / chartProp.pxToMM;
 		var yCenter = (chartProp.chartGutter._top + trueHeight / 2) / chartProp.pxToMM;
 
-		var points = [];
-
 		var seria = chartProp.series;
 		var numChache = this.getNumCache(seria[0].val);
 
-		var angle = Math.PI * 2 / numChache.ptCount;
-		var radius = trueHeight / 2 / chartProp.pxToMM;
-		var startAngle = (Math.PI / 2) * 3;
-		var x, y;
+		var angle = (Math.PI * 2 / numChache.ptCount) * idx;
+		var radius = (trueHeight / 2) / chartProp.pxToMM;
+		var startAngle = (Math.PI / 2) * 3 + angle;
 
-		for (var i = 0; i < numChache.ptCount; i++) {
-			x = xCenter + radius * Math.cos(startAngle);
-			y = yCenter + radius * Math.sin(startAngle);
-			points.push({ x: x, y: y });
-			startAngle += angle;
-		}
+		var x = xCenter + radius * Math.cos(startAngle);
+		var y = yCenter + radius * Math.sin(startAngle);
 
-		return points;
+		return { x: x, y: y };
 	},
 	//****calculate margins****
 	_calculateMarginsChart: function (chartSpace, dNotPutResult) {
@@ -14524,7 +14521,7 @@ axisChart.prototype = {
 	
 			return pathId;
 		}
-		var points;
+
 		if (this.cChartDrawer.nDimensionCount === 3) {
 			var z;
 			if (this.axisType === AscDFH.historyitem_type_ValAx) {
@@ -14541,24 +14538,14 @@ axisChart.prototype = {
 			y1 = convertResult.y / this.chartProp.pxToMM;
 
 		}
-		points = this.cChartDrawer._calculatePositionLabelsCatAxForRadar();
-		if (points && this.axisType === AscDFH.historyitem_type_CatAx) {
-			for (var i = 0; i < points.length; i++) {
-				if (i === 0) {
-					path.moveTo(points[i].x * pathW, points[i].y * pathH);
-				} else {
-					path.lnTo(points[i].x * pathW, points[i].y * pathH);
-				}
-			}
-			path.lnTo(points[0].x * pathW, points[0].y * pathH);
+
+		if (this.axis.axPos === window['AscFormat'].AX_POS_L || this.axis.axPos === window['AscFormat'].AX_POS_R) {
+			path.moveTo(x1 * pathW, y1 * pathH);
+			path.lnTo(x * pathW, y * pathH);
+		} else {
+			path.moveTo(x * pathW, y * pathH);
+			path.lnTo(x1 * pathW, y1 * pathH);
 		}
-		// if (this.axis.axPos === window['AscFormat'].AX_POS_L || this.axis.axPos === window['AscFormat'].AX_POS_R) {
-		// 	path.moveTo(x1 * pathW, y1 * pathH);
-		// 	path.lnTo(x * pathW, y * pathH);
-		// } else {
-		// 	path.moveTo(x * pathW, y * pathH);
-		// 	path.lnTo(x1 * pathW, y1 * pathH);
-		// }
 
 		return pathId;
 	},
