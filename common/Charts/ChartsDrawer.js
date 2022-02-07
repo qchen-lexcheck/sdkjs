@@ -560,17 +560,22 @@ CChartsDrawer.prototype =
 					break;
 				}
 				case AscDFH.historyitem_type_Title: {
-					if (obj.parent.getObjectType() === AscDFH.historyitem_type_CatAx) {
-						pos = this._calculatePositionLabelsCatAxForRadar(idx);
-					} else {
+					var parentType = obj.parent ? obj.parent.getObjectType() : null;
+					if (parentType === AscDFH.historyitem_type_Chart) {
 						pos = this._calculatePositionTitle(obj);
+					} else if (parentType === AscDFH.historyitem_type_ValAx || parentType === AscDFH.historyitem_type_CatAx || parentType === AscDFH.historyitem_type_DateAx) {
+						pos = this._calculatePositionAxisTitle(obj);
+					}
+					break;
+				}
+				case AscDFH.historyitem_type_CatAx: {
+					if (this.calcProp.type === c_oChartTypes.Radar) {
+						pos = this._calculatePositionLabelsCatAxForRadar(idx);
 					}
 					break;
 				}
 				case AscDFH.historyitem_type_ValAx:
-				case AscDFH.historyitem_type_CatAx:
 				case AscDFH.historyitem_type_DateAx: {
-					pos = this._calculatePositionAxisTitle(obj);
 					break;
 				}
 				case AscDFH.historyitem_type_Legend: {
@@ -578,7 +583,7 @@ CChartsDrawer.prototype =
 					break;
 				}
 				default: {
-					pos = {x: 0, y: 0};
+					pos = { x: 0, y: 0 };
 					break;
 				}
 			}
