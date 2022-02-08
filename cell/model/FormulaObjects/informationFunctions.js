@@ -147,10 +147,15 @@
 
 				var isRangeArg1 = cElementType.cellsRange === arg1.type || cElementType.cellsRange3D === arg1.type;
 				if (isRangeArg1 || cElementType.cell === arg1.type || cElementType.cell3D === arg1.type) {
-					var _tempValue = isRangeArg1 ? arg1.getValueByRowCol(0,0) : arg1.getValue();
+					//проверям на циклическую ссылку
+					if (arg1.range && arg1.range.bbox && arg1.range.worksheet === ws && arg1.range.bbox.containsRange(opt_bbox)) {
+						return new cError(cErrorType.bad_reference);
+					}
+					/*var _tempValue = isRangeArg1 ? arg1.getValueByRowCol(0,0) : arg1.getValue();
 					if (_tempValue instanceof cError) {
 						return _tempValue;
-					}
+					}*/
+
 					bbox = arg1.getRange();
 					bbox = bbox && bbox.bbox;
 				} else {
