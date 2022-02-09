@@ -1112,6 +1112,19 @@ var GLOBAL_PATH_COUNT = 0;
         this.aStrings = [];
     }
 
+    CAxisGrid.prototype.calculatePoints = function(aPoints, bOnTickMark, aScale) {
+        var fStartSeriesPos = 0.0;
+        if(!this.bOnTickMark) {
+            fStartSeriesPos = this.fStride / 2.0;
+        }
+        for(var j = 0; j < this.aStrings.length; ++j) {
+            aPoints.push({
+                val: aScale[j],
+                pos: this.fStart + j * this.fStride + fStartSeriesPos
+            })
+        }
+    }
+
     function CChartSpace() {
         AscFormat.CGraphicObjectBase.call(this);
         this.nvGraphicFramePr = null;
@@ -4596,16 +4609,7 @@ var GLOBAL_PATH_COUNT = 0;
                 }
             }
             if(null !== aPoints) {
-                var fStartSeriesPos = 0.0;
-                if(!bOnTickMark) {
-                    fStartSeriesPos = oCurAxis.grid.fStride / 2.0;
-                }
-                for(var j = 0; j < oCurAxis.grid.aStrings.length; ++j) {
-                    aPoints.push({
-                        val: oCurAxis.scale[j],
-                        pos: oCurAxis.grid.fStart + j * oCurAxis.grid.fStride + fStartSeriesPos
-                    })
-                }
+                oCurAxis.grid.calculatePoints(aPoints, bOnTickMark, oCurAxis.scale);
                 if(aPoints.length > 1) {
                     var fNullPos;
                     var oP1 = aPoints[0];
@@ -4732,6 +4736,8 @@ var GLOBAL_PATH_COUNT = 0;
         this.cachedCanvas = null;
         this.plotAreaRect = null;
         this.bEmptySeries = this.checkEmptySeries();
+        var oSize = this.getChartSizes();
+        var oRect = new CRect(oSize.startX, oSize.startY, oSize.w - dSeriesLabelsWidth, oSize.h);
         if(this.chart && this.chart.plotArea) {
             var oPlotArea = this.chart.plotArea;
             for(i = 0; i < oPlotArea.axId.length; ++i) {
@@ -4818,7 +4824,7 @@ var GLOBAL_PATH_COUNT = 0;
                 }
                 else {
                     aSeriesAxes.push(oCurAxis);
-                    this.calculateAxisGrid(oCurAxis);
+                    this.calculateAxisGrid(oCurAxis, oRect);
                     oCurAxis.labels = null;
                     var nLabelsPos = c_oAscTickLabelsPos.TICK_LABEL_POSITION_NEXT_TO;
                     if(oCurAxis.bDelete) {
@@ -4839,13 +4845,54 @@ var GLOBAL_PATH_COUNT = 0;
                     }
                 }
             }
-            var oSize = this.getChartSizes();
-            var oRect = new CRect(oSize.startX, oSize.startY, oSize.w - dSeriesLabelsWidth, oSize.h);
             var oBaseRect = oRect;
             var aRects = [];
-            for(i = 0; i < aAllAxes.length; ++i) {
-                aCurAxesSet = aAllAxes[i];
-                aRects.push(this.recalculateAxesSet(aCurAxesSet, oRect, oBaseRect, 0));
+            var fForceContentWidth = undefined;
+            if(aCharts[0] && aCharts[0].getObjectType() === AscDFH.historyitem_type_RadarChart) {
+                var aAxes = [];
+                for(var sAxId in oAxesMap) {
+                    if(oAxesMap.hasOwnProperty(sAxId)) {
+                        aAxes.push(oAxesMap[sAxId]);
+                    }
+                }
+                for(i = 0; i < aAxes.length; ++i) {
+                    oCurAxis = aAxes[i];
+
+                    this.calculateAxisGrid(oCurAxis, oRect);
+                    oCurAxis.labels = null;
+                    var nLabelsPos = c_oAscTickLabelsPos.TICK_LABEL_POSITION_NEXT_TO;
+                    if(oCurAxis.bDelete) {
+                        nLabelsPos = c_oAscTickLabelsPos.TICK_LABEL_POSITION_NONE;
+                    }
+                    else {
+                        if(null !== oCurAxis.tickLblPos) {
+                            nLabelsPos = oCurAxis.tickLblPos;
+                        }
+                        else {
+                            nLabelsPos = c_oAscTickLabelsPos.TICK_LABEL_POSITION_NEXT_TO;
+                        }
+                    }
+                    if(nLabelsPos !== c_oAscTickLabelsPos.TICK_LABEL_POSITION_NONE) {
+                        var oLabelsBox = new CLabelsBox(oCurAxis.grid.aStrings, oCurAxis, this);
+                        oCurAxis.labels = oLabelsBox;
+                    }
+                    if(oCurAxis.labels) {
+                        if(oCurAxis.getObjectType() === AscDFH.historyitem_type_CatAx ||
+                            oCurAxis.getObjectType() === AscDFH.historyitem_type_DateAx) {
+                            oCurAxis.labels.layoutHorNormal(oCurAxis.posY, 0, oCurAxis.posX, 0, oCurAxis.grid.bOnTickMark, 2000);
+                        }
+                        else if(oCurAxis.getObjectType() === AscDFH.historyitem_type_ValAx) {
+
+                            oCurAxis.labels.layoutVertNormal(oCurAxis.posY, 0, oCurAxis.posX, 0, oCurAxis.grid.bOnTickMark, 2000);
+                        }
+                    }
+                }
+            }
+            else {
+                for(i = 0; i < aAllAxes.length; ++i) {
+                    aCurAxesSet = aAllAxes[i];
+                    aRects.push(this.recalculateAxesSet(aCurAxesSet, oRect, oBaseRect, 0, fForceContentWidth));
+                }
             }
             if(aRects.length > 1) {
                 oRect = aRects[0].copy();
@@ -4988,13 +5035,130 @@ var GLOBAL_PATH_COUNT = 0;
                 }
             }
 
-            var oChartSize = this.getChartSizes(true);
-            this.chart.plotArea.x = oChartSize.startX;
-            this.chart.plotArea.y = oChartSize.startY;
-            this.chart.plotArea.extX = oChartSize.w;
-            this.chart.plotArea.extY = oChartSize.h;
-            this.chart.plotArea.localTransform.Reset();
-            AscCommon.global_MatrixTransformer.TranslateAppend(this.chart.plotArea.localTransform, oChartSize.startX, oChartSize.startY);
+            var oChartSize;
+
+            var oFirstChart = oPlotArea.charts[0];
+            if(oFirstChart && oFirstChart.getObjectType() === AscDFH.historyitem_type_RadarChart) {
+                var oCatAx, oValAx;
+                var oAx;
+                for(var nAx = 0; nAx < oFirstChart.axId.length; ++nAx) {
+                    oAx = oFirstChart.axId[nAx];
+                    if(oAx.getObjectType() === AscDFH.historyitem_type_CatAx ||
+                        oAx.getObjectType() === AscDFH.historyitem_type_DateAx) {
+                        oCatAx = oAx;
+                    }
+                    else if(oAx.getObjectType() === AscDFH.historyitem_type_ValAx) {
+                        oValAx = oAx;
+                    }
+                }
+                if(oCatAx && oValAx) {
+
+                    var oCatLabels = oCatAx.labels;
+                    var dCatLabelsHeight = 0;
+                    var dCatLabelsWidth = 0;
+                    if(oCatLabels) {
+                        dCatLabelsWidth = oCatLabels.maxMinWidth;
+
+                        for(var nLabel = 0; nLabel < oCatLabels.aLabels.length; ++nLabel) {
+                            var oLabel = oCatLabels.aLabels[nLabel];
+                            if(oLabel) {
+                                oSize = oLabel.tx.rich.getContentOneStringSizes();
+                                if(oSize.h > dCatLabelsHeight) {
+                                    dCatLabelsHeight = oSize.h;
+                                }
+                            }
+                        }
+                    }
+                    oCatAx.labels.extY = 0;
+                    oValAx.yPoints = [];
+                    oChartSize = this.getChartSizes(false);
+                    this.chart.plotArea.x = oChartSize.startX;
+                    this.chart.plotArea.y = oChartSize.startY;
+                    this.chart.plotArea.extX = oChartSize.w;
+                    this.chart.plotArea.extY = oChartSize.h;
+                    this.chart.plotArea.localTransform.Reset();
+                    AscCommon.global_MatrixTransformer.TranslateAppend(this.chart.plotArea.localTransform, oChartSize.startX, oChartSize.startY);
+                    var dX = Math.max(5, oChartSize.startX + dCatLabelsWidth);
+                    var dY = Math.max(5, oChartSize.startY + dCatLabelsHeight);
+                    var extX = Math.max(5, oChartSize.w - 2*dCatLabelsWidth);
+                    var extY = Math.max(5, oChartSize.h - 2*dCatLabelsHeight);
+                    var dCenterX = dX + extX / 2;
+                    var dCenterY = dY + extY / 2;
+                    var dLength = Math.min(extX/2, extY/2)
+                    oValAx.posX = dCenterX;
+                    oRect = {x: 0, y: dY, w: 0, h: dCenterY - dY};
+                    this.calculateAxisGrid(oValAx, oRect);
+                    oValAx.grid.calculatePoints(oValAx.yPoints, bOnTickMark, oCurAxis.scale);
+                    var fPosStart = oValAx.grid.fStart;
+                    var fPosEnd = oValAx.grid.fStart + oCurAxis.grid.nCount * oCurAxis.grid.fStride;
+                    fLayoutVertLabelsBox(oValAx.labels, dCenterX, fPosStart, fPosEnd, true, -DEFAULT_LBLS_DISTANCE, true);
+                    if(oCatLabels) {
+                        var fAngleInterval = 2*Math.PI / oCatLabels.count;
+                        for(var nLabel = 0; nLabel < oCatLabels.aLabels.length; ++nLabel) {
+                            var oLabel = oCatLabels.aLabels[nLabel];
+                            if(oLabel) {
+                                oSize = oLabel.tx.rich.getContentOneStringSizes();
+                                var fAngle = fAngleInterval*nLabel;
+                                var dQuad = fAngle / (Math.PI/2);
+                                var nQuad = dQuad >> 0;
+                                var oTransform = oLabel.localTransformText;
+                                oTransform.Reset();
+                                var dNewX = 0, dNewY = 0;
+                                if(AscFormat.fApproxEqual(dQuad, nQuad, 0.01)) {
+                                    if(AscFormat.fApproxEqual(fAngle, 0, 0.5) || AscFormat.fApproxEqual(fAngle, 2*Math.PI, 0.5)) {
+                                        dNewX = dCenterX - oSize.w / 2;
+                                        dNewY = dCenterY - dLength - dCatLabelsHeight;
+                                    }
+                                    else if(AscFormat.fApproxEqual(fAngle, Math.PI / 2, 0.5)) {
+                                        dNewX = dCenterX + dLength;
+                                        dNewY = dCenterY - oSize.h / 2;
+                                    }
+                                    else if(AscFormat.fApproxEqual(fAngle, Math.PI, 0.5)) {
+                                        dNewX = dCenterX - oSize.w/ 2;
+                                        dNewY = dCenterY + dLength;
+                                    }
+                                    else if(AscFormat.fApproxEqual(fAngle, 3 * Math.PI / 2, 0.5)) {
+                                        dNewX = dCenterX - dLength - oSize.w;
+                                        dNewY = dCenterY - oSize.h / 2;
+                                    }
+                                }
+                                else {
+                                    if(nQuad === 0) {
+                                        dNewX = dCenterX + Math.sin(fAngle) * dLength;
+                                        dNewY = dCenterY - Math.cos(fAngle) * dLength - oSize.h;
+                                    }
+                                    else if(nQuad === 1) {
+                                        dNewX = dCenterX + Math.sin(fAngle) * dLength;
+                                        dNewY = dCenterY - Math.cos(fAngle) * dLength;
+                                    }
+                                    else if(nQuad === 2) {
+                                        dNewX = dCenterX + Math.sin(fAngle) * dLength - oSize.w;
+                                        dNewY = dCenterY - Math.cos(fAngle) * dLength;
+                                    }
+                                    else if(nQuad === 3) {
+                                        dNewX = dCenterX + Math.sin(fAngle) * dLength - oSize.w;
+                                        dNewY = dCenterY - Math.cos(fAngle) * dLength - oSize.h;
+                                    }
+                                }
+                                var oFirstPara = oLabel.tx.rich.content.Content[0];
+                                if(oFirstPara.CompiledPr.Pr.ParaPr.Jc === AscCommon.align_Center) {
+                                    dNewX = dNewX + oSize.w/2 - oLabel.tx.rich.content.XLimit/2;
+                                }
+                                global_MatrixTransformer.TranslateAppend(oTransform, dNewX, dNewY);
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                oChartSize = this.getChartSizes(true);
+                this.chart.plotArea.x = oChartSize.startX;
+                this.chart.plotArea.y = oChartSize.startY;
+                this.chart.plotArea.extX = oChartSize.w;
+                this.chart.plotArea.extY = oChartSize.h;
+                this.chart.plotArea.localTransform.Reset();
+                AscCommon.global_MatrixTransformer.TranslateAppend(this.chart.plotArea.localTransform, oChartSize.startX, oChartSize.startY);
+            }
         }
     };
     CChartSpace.prototype.distributeValues = function(aVals) {
@@ -6698,7 +6862,6 @@ var GLOBAL_PATH_COUNT = 0;
         var oChartSize = this.chartObj.calculateSizePlotArea(this, bNotRecalculate);
         var oLayout = this.chart.plotArea.layout;
         if(oLayout) {
-
             oChartSize.startX = this.calculatePosByLayout(oChartSize.startX, oLayout.xMode, oLayout.x, oChartSize.w, this.extX);
             oChartSize.startY = this.calculatePosByLayout(oChartSize.startY, oLayout.yMode, oLayout.y, oChartSize.h, this.extY);
             var fSize = this.calculateSizeByLayout(oChartSize.startX, this.extX, oLayout.w, oLayout.wMode);

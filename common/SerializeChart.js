@@ -11352,8 +11352,8 @@ BinaryChartReader.prototype.ReadCT_PlotArea = function (type, length, val, oIdTo
             return oThis.ReadCT_RadarChart(t, l, oNewVal, aChartWithAxis);
         });
         //radar -> line
-        var line = this.ConvertRadarToLine(oNewVal, aChartWithAxis);
-        val.addChart(line);
+        //var line = this.ConvertRadarToLine(oNewVal, aChartWithAxis);
+        val.addChart(oNewVal);
     }
     else if (c_oserct_plotareaSCATTERCHART === type) {
         var oNewVal = new AscFormat.CScatterChart();
