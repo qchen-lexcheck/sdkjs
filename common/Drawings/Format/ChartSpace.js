@@ -4737,7 +4737,7 @@ var GLOBAL_PATH_COUNT = 0;
         this.plotAreaRect = null;
         this.bEmptySeries = this.checkEmptySeries();
         var oSize = this.getChartSizes();
-        var oRect = new CRect(oSize.startX, oSize.startY, oSize.w - dSeriesLabelsWidth, oSize.h);
+        var oRect = new CRect(oSize.startX, oSize.startY, oSize.w, oSize.h);
         if(this.chart && this.chart.plotArea) {
             var oPlotArea = this.chart.plotArea;
             for(i = 0; i < oPlotArea.axId.length; ++i) {
@@ -4842,6 +4842,7 @@ var GLOBAL_PATH_COUNT = 0;
                         var oLabelsBox = new CLabelsBox(oCurAxis.grid.aStrings, oCurAxis, this);
                         oCurAxis.labels = oLabelsBox;
                         dSeriesLabelsWidth = oLabelsBox.maxMinWidth;
+                        oRect = new CRect(oSize.startX, oSize.startY, oSize.w - dSeriesLabelsWidth, oSize.h);
                     }
                 }
             }
