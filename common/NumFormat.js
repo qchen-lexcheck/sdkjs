@@ -319,7 +319,6 @@ function ParseLocalFormatSymbol(Name)
 	LocaleFormatSymbol['s'] = 's';
 	LocaleFormatSymbol['G'] = 'G';
 	LocaleFormatSymbol['g'] = 'g';
-	LocaleFormatSymbol['E'] = 'E';
 	LocaleFormatSymbol['e'] = 'e';
 	LocaleFormatSymbol['general'] = 'General';
 	switch (Name) {
@@ -600,8 +599,8 @@ function ParseLocalFormatSymbol(Name)
 			LocaleFormatSymbol['s'] = 'n';
 			
 			// В excel это не работает и нет в данной локализации таких символов, поэтому пока такой костыль, иначе всё перестанет работать вообще
-			LocaleFormatSymbol['G'] = 'Z';
-			LocaleFormatSymbol['g'] = 'z';
+			/*LocaleFormatSymbol['G'] = 'Z';
+			LocaleFormatSymbol['g'] = 'z';*/
 
 			LocaleFormatSymbol['general'] = 'Genel';
 			break;
@@ -614,8 +613,8 @@ function ParseLocalFormatSymbol(Name)
 			LocaleFormatSymbol['h'] = 'g';
 
 			// В excel это не работает и нет в данной локализации таких символов, поэтому пока такой костыль, иначе всё перестанет работать вообще
-			LocaleFormatSymbol['G'] = 'Z';
-			LocaleFormatSymbol['g'] = 'z';
+			/*LocaleFormatSymbol['G'] = 'Z';
+			LocaleFormatSymbol['g'] = 'z';*/
 
 			LocaleFormatSymbol['general'] = 'Standardowy';
 			break;
@@ -637,16 +636,6 @@ function ParseLocalFormatSymbol(Name)
 			LocaleFormatSymbol['general'] = 'G/표준';
 			break;
 		}
-		/*case("iu"):
-		case("iu-Cans"): {
-			LocaleFormatSymbol['Y'] = 'A';
-			LocaleFormatSymbol['y'] = 'a';
-			LocaleFormatSymbol['D'] = 'G';
-			LocaleFormatSymbol['d'] = 'g';
-			LocaleFormatSymbol['G'] = 'X';
-			LocaleFormatSymbol['g'] = 'x';
-			LocaleFormatSymbol['general'] = 'Standard';
-		}*/
 	}
 	return true;
 }
@@ -681,6 +670,7 @@ function NumFormat(bAddMinusIfNes)
 	this.ComporationOperator = null;
 	this.LCID = null;
 	this.CurrencyString = null;
+	this.bCurrentEraYear = false;
     
 	this.bGeneralChart = false;//если в формате только один текст(например в chart "Основной")
     this.bAddMinusIfNes = bAddMinusIfNes;//когда не задано форматирование для отрицательных чисел иногда надо вставлять минус
@@ -818,7 +808,6 @@ NumFormat.prototype =
         var second;
 		var Gannen;
 		var gannen;
-		var Era;
 		var era;
 		if (useLocaleFormat) {
 			sGeneral = LocaleFormatSymbol['general'].toLowerCase();
@@ -839,7 +828,6 @@ NumFormat.prototype =
 			second = LocaleFormatSymbol['s'];
 			Gannen = LocaleFormatSymbol['G'];
 			gannen = LocaleFormatSymbol['g'];
-			Era = LocaleFormatSymbol['E'];
 			era = LocaleFormatSymbol['e'];
 		} else {
 			sGeneral = AscCommon.g_cGeneralFormat.toLowerCase();
@@ -860,10 +848,8 @@ NumFormat.prototype =
 			second = 's';
 			Gannen = 'G';
 			gannen = 'g';
-			Era = 'E';
 			era = 'e';
 		}
-		var bIsForGannen = false;
         var sGeneralFirst = sGeneral[0];
         this.bGeneralChart = true;
         while(true)
@@ -920,24 +906,16 @@ NumFormat.prototype =
                 this._addToFormat(numFormat_General);
                 this._skip(sGeneral.length - 1);
             }
-			else if (Gannen == next || gannen == next)
-			{
-				bIsForGannen = true;
-				this._addToFormat2(new FormatObjDateVal(numFormat_Gannen, 1, false));
-			}
-            else if("E" == next || "e" == next || Era == next || era == next)
+            else if("E" == next || "e" == next || era == next)
             {
 				var nextChar = this._readNextChar();
-				if(this.EOF != nextChar && "+" == nextChar || "-" == nextChar)
+				if((this.EOF != nextChar && "+" == nextChar || "-" == nextChar) && ("E" == next || "e" == next))
 				{
 					var nextnext = this._readChar();
-					if(this.EOF != nextnext && "+" == nextnext || "-" == nextnext)
-					{
-						var sign = ("+" == nextnext) ? SignType.Positive : SignType.Negative;
-						this._addToFormat2(new FormatObjScientific(next, "", sign));
-					}
+					var sign = ("+" == nextnext) ? SignType.Positive : SignType.Negative;
+					this._addToFormat2(new FormatObjScientific(next, "", sign));
 				}
-				else if (Era == next || era == next)
+				else if (era == next)
 				{
 					this._addToFormat2(new FormatObjDateVal(numFormat_JapanYearsGannen, 1, false));
 				}
@@ -986,6 +964,10 @@ NumFormat.prototype =
             {
                 this._addToFormat2(new FormatObjDateVal(numFormat_Second, 1, false));
             }
+			else if (Gannen == next || gannen == next)
+			{
+				this._addToFormat2(new FormatObjDateVal(numFormat_Gannen, 1, false));
+			}
             else if ("A" == next || "a" == next) {
                 this._ReadAmPm(next);
             } else {
@@ -1878,7 +1860,16 @@ NumFormat.prototype =
                         }
 						if (null != item.Lid) {
 							//Excel sometimes add 0x10000(0x442 and 0x10442)
-							this.LCID = parseInt(item.Lid, 16) & 0xFFFF;
+							if(parseInt(item.Lid, 16) >= 0xFFFF)
+							{
+								this.bCurrentEraYear = true;
+								this.LCID = parseInt(item.Lid, 16) & 0xFFFF;
+							}
+							else
+							{
+								this.bCurrentEraYear = false;
+								this.LCID = parseInt(item.Lid, 16) & 0xFFFF;
+							}
 						}
                     }
                     else if (numFormat_DecimalPoint == item.type) {
@@ -1989,7 +1980,7 @@ NumFormat.prototype =
 		}
 		return forceNull;
 	},
-    format: function (number, nValType, dDigitsCount, cultureInfo, bChart, opt_forceNull)
+    format: function (number, nValType, dDigitsCount, cultureInfo, bChart, opt_forceNull, bIsCurrentEra)
     {
         if (null == cultureInfo)
             cultureInfo = g_oDefaultCultureInfo;
@@ -2244,13 +2235,35 @@ NumFormat.prototype =
 				}
                 else if(numFormat_Year == item.type)
                 {
-                  if (item.val > 0) {
-                    if (item.val <= 2) {
-                      	oCurText.text += (oParsedNumber.date.year+'').substring(2);
-                    } else {
-                		oCurText.text += oParsedNumber.date.year;
-                    }
-                  }
+					if(null !== bIsCurrentEra && bIsCurrentEra)
+					{
+						if (oParsedNumber.dec <= 4594) {
+							oCurrentEra = gc_aJapanEras[0];
+						}
+						else if (oParsedNumber.dec <= 9855) {
+							oCurrentEra = gc_aJapanEras[1];
+						}
+						else if (oParsedNumber.dec <= 32515) {
+							oCurrentEra = gc_aJapanEras[2];
+						}
+						else if (oParsedNumber.dec <= 43585) {
+							oCurrentEra = gc_aJapanEras[3];
+						}
+						else if (oParsedNumber.dec >= 43586) {
+							oCurrentEra = gc_aJapanEras[4];
+						}
+						if (oCurrentEra != null)
+						{
+							oCurText.text += (oParsedNumber.date.year - oCurrentEra[3] + 1);
+						}
+					}
+					else if (item.val > 0) {
+                    	if (item.val <= 2) {
+                      		oCurText.text += (oParsedNumber.date.year+'').substring(2);
+                    	} else {
+                			oCurText.text += oParsedNumber.date.year;
+                    	}
+                  	}
                 }
                 else if(numFormat_Month == item.type)
                 {
@@ -2949,7 +2962,7 @@ CellFormat.prototype =
 		}
 		return oRes;
 	},
-    format : function(number, nValType, dDigitsCount, bChart, cultureInfo, opt_withoutCache, opt_forceNull)
+    format : function(number, nValType, dDigitsCount, bChart, cultureInfo, opt_withoutCache, opt_forceNull, bIsCurrentEra)
     {
 		//opt_withoutCache = true;
         var res = null;
@@ -2977,7 +2990,7 @@ CellFormat.prototype =
 		{
 			oFormat = this.getFormatByValue(dNumber);
 			if(null != oFormat)
-			    res = oFormat.format(number, nValType, dDigitsCount, cultureInfo, bChart, opt_forceNull);
+			    res = oFormat.format(number, nValType, dDigitsCount, cultureInfo, bChart, opt_forceNull, bIsCurrentEra);
 			else if(null != this.aComporationFormats)
 			{
 			    var oNewFont = new AscCommonExcel.Font();
@@ -2990,7 +3003,7 @@ CellFormat.prototype =
 			//text
 		    if (null != this.oTextFormat) {
 		        oFormat = this.oTextFormat;
-		        res = oFormat.format(number, nValType, dDigitsCount, cultureInfo, bChart, opt_forceNull);
+		        res = oFormat.format(number, nValType, dDigitsCount, cultureInfo, bChart, opt_forceNull, bIsCurrentEra);
 		    }
 		}
         if (!opt_withoutCache) {
