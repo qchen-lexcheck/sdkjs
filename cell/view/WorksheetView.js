@@ -1746,6 +1746,7 @@
 
 	WorksheetView.prototype._calcHeightRow = function (y, i) {
 		var r, hR;
+		var t = this;
 		this.model._getRowNoEmptyWithAll(i, function (row) {
 			if (!row) {
 				hR = -1; // Будет использоваться дефолтная высота строки
@@ -1756,7 +1757,16 @@
 				if (row.h > 0 && (row.getCustomHeight() || row.getCalcHeight())) {
 					hR = row.h;
 				} else {
-					hR = -1;
+					//для бага 55320
+					if (row.xfs && row.xfs.font) {
+						var fm = getFontMetrics(row.xfs.font, t.stringRender);
+						var lm = t.stringRender._calcLineMetrics2(row.xfs.font.getSize(), row.xfs.font.va, fm);
+						hR = lm.th
+					} else {
+						hR = -1;
+					}
+
+
 				}
 			}
 		});
@@ -4983,6 +4993,17 @@
 					bTopCur = bTopNext;
 				}
 
+				//для бага 55317
+				//если мы пропускаем скрытую колонку, которая является частью мерженной, там могут быть стили, которые мы пропускаем по общей схеме
+				var needDrawRightBorder = false;
+				if (nextCol !== col + 1 && bCur.mergeInfo && nextCol - 1 === bCur.mergeInfo.c2) {
+					needDrawRightBorder = true;
+					/*var prevSkipBorder = t._getVisibleCell(nextCol - 1, row).getBorder();
+					if (prevSkipBorder) {
+						bCur.borders.r = bCur.borders._mergeProperty(bCur.borders.r, prevSkipBorder.r).clone();
+					}*/
+				}
+
 				if (col === t.nColsCount) {
 					bNext = null;
 					bTopNext = null;
@@ -5040,7 +5061,7 @@
 //						}
 				}
 				// draw right border
-				if ((!mc || col === mc.c2) && !t._isRightBorderErased(col, rowCache)) {
+				if ((!mc || col === mc.c2 || needDrawRightBorder) && !t._isRightBorderErased(col, rowCache)) {
 					drawVerticalBorder(bCur, bNext, x2, y1, y2);
 				}
 				// draw top border
