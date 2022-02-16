@@ -5633,54 +5633,50 @@ var GLOBAL_PATH_COUNT = 0;
                     calc_entry.calcMarkerUnion = new AscFormat.CUnionMarker();
                     union_marker = calc_entry.calcMarkerUnion;
                     var pts = ser.getNumPts();
-                    switch(ser.getObjectType()) {
-                        case AscDFH.historyitem_type_BarSeries:
-                        case AscDFH.historyitem_type_BubbleSeries:
-                        case AscDFH.historyitem_type_AreaSeries:
-                        case AscDFH.historyitem_type_PieSeries:
-                        {
+                    var nSerType = ser.getObjectType();
+                    if(nSerType === AscDFH.historyitem_type_BarSeries ||
+                        nSerType === AscDFH.historyitem_type_BubbleSeries ||
+                        nSerType === AscDFH.historyitem_type_AreaSeries ||
+                        nSerType === AscDFH.historyitem_type_PieSeries ||
+                        (nSerType === AscDFH.historyitem_type_RadarSeries &&
+                            ser.parent && ser.parent.radarStyle === AscFormat.RADAR_STYLE_FILLED)) {
+
+                        union_marker.marker = AscFormat.CreateMarkerGeometryByType(AscFormat.SYMBOL_SQUARE);
+                        union_marker.marker.pen = ser.compiledSeriesPen;
+                        union_marker.marker.brush = ser.compiledSeriesBrush;
+                    }
+                    else if(nSerType === AscDFH.historyitem_type_SurfaceSeries) {
+                        var oBandFmt = this.chart.plotArea.charts[0].compiledBandFormats[i];
+                        union_marker.marker = AscFormat.CreateMarkerGeometryByType(AscFormat.SYMBOL_SQUARE);
+                        union_marker.marker.pen = oBandFmt.spPr.ln;
+                        union_marker.marker.brush = oBandFmt.spPr.Fill;
+                    }
+                    else if(nSerType === AscDFH.historyitem_type_LineSeries ||
+                            nSerType === AscDFH.historyitem_type_ScatterSer ||
+                            nSerType === AscDFH.historyitem_type_RadarSeries) {
+
+                        if(AscFormat.CChartsDrawer.prototype._isSwitchCurrent3DChart(this)) {
                             union_marker.marker = AscFormat.CreateMarkerGeometryByType(AscFormat.SYMBOL_SQUARE);
                             union_marker.marker.pen = ser.compiledSeriesPen;
                             union_marker.marker.brush = ser.compiledSeriesBrush;
                             break;
                         }
-                        case AscDFH.historyitem_type_SurfaceSeries:
-                        {
+                        if(ser.compiledSeriesMarker) {
+                            var pts = ser.getNumPts();
+                            union_marker.marker = AscFormat.CreateMarkerGeometryByType(ser.compiledSeriesMarker.symbol);
+                            if(pts[0] && pts[0].compiledMarker) {
+                                union_marker.marker.brush = pts[0].compiledMarker.brush;
+                                union_marker.marker.pen = pts[0].compiledMarker.pen;
 
-                            var oBandFmt = this.chart.plotArea.charts[0].compiledBandFormats[i];
-                            union_marker.marker = AscFormat.CreateMarkerGeometryByType(AscFormat.SYMBOL_SQUARE);
-                            union_marker.marker.pen = oBandFmt.spPr.ln;
-                            union_marker.marker.brush = oBandFmt.spPr.Fill;
-                            break;
+                            }
                         }
-                        case AscDFH.historyitem_type_LineSeries:
-                        case AscDFH.historyitem_type_ScatterSer:
-                        case AscDFH.historyitem_type_RadarSeries:
-                        {
-                            if(AscFormat.CChartsDrawer.prototype._isSwitchCurrent3DChart(this)) {
-                                union_marker.marker = AscFormat.CreateMarkerGeometryByType(AscFormat.SYMBOL_SQUARE);
-                                union_marker.marker.pen = ser.compiledSeriesPen;
-                                union_marker.marker.brush = ser.compiledSeriesBrush;
-                                break;
-                            }
-                            if(ser.compiledSeriesMarker) {
-                                var pts = ser.getNumPts();
-                                union_marker.marker = AscFormat.CreateMarkerGeometryByType(ser.compiledSeriesMarker.symbol);
-                                if(pts[0] && pts[0].compiledMarker) {
-                                    union_marker.marker.brush = pts[0].compiledMarker.brush;
-                                    union_marker.marker.pen = pts[0].compiledMarker.pen;
 
-                                }
-                            }
-
-                            if(ser.compiledSeriesPen && !b_scatter_no_line) {
-                                union_marker.lineMarker = AscFormat.CreateMarkerGeometryByType(AscFormat.SYMBOL_DASH);
-                                union_marker.lineMarker.pen = ser.compiledSeriesPen.createDuplicate(); //Копируем, так как потом возможно придется изменять толщину линии;
-                            }
-                            if(!b_scatter_no_line && !AscFormat.CChartsDrawer.prototype._isSwitchCurrent3DChart(this))
-                                b_line_series = true;
-                            break;
+                        if(ser.compiledSeriesPen && !b_scatter_no_line) {
+                            union_marker.lineMarker = AscFormat.CreateMarkerGeometryByType(AscFormat.SYMBOL_DASH);
+                            union_marker.lineMarker.pen = ser.compiledSeriesPen.createDuplicate(); //Копируем, так как потом возможно придется изменять толщину линии;
                         }
+                        if(!b_scatter_no_line && !AscFormat.CChartsDrawer.prototype._isSwitchCurrent3DChart(this))
+                            b_line_series = true;
                     }
                     if(union_marker.marker) {
                         union_marker.marker.pen && union_marker.marker.pen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
@@ -7427,301 +7423,48 @@ var GLOBAL_PATH_COUNT = 0;
                     }
                 }
                 else {
-                    switch(oChart.getObjectType()) {
-                        case AscDFH.historyitem_type_LineChart:
-                        case AscDFH.historyitem_type_RadarChart:
-                        {
-                            var base_line_fills = getArrayFillsFromBase(style.line4, nMaxSeriesIdx);
-                            if(!AscFormat.CChartsDrawer.prototype._isSwitchCurrent3DChart(this)) {
-                                for(var i = 0; i < series.length; ++i) {
-                                    var default_line = parents.theme.themeElements.fmtScheme.lnStyleLst[0];
-                                    var ser = series[i];
-                                    var pts = ser.getNumPts();
-                                    this.ptsCount += pts.length;
-                                    var compiled_line = new AscFormat.CLn();
-                                    compiled_line.merge(default_line);
-                                    compiled_line.Fill && compiled_line.Fill.merge(base_line_fills[ser.idx]);
-                                    compiled_line.w *= style.line3;
-                                    if(ser.spPr && ser.spPr.ln)
-                                        compiled_line.merge(ser.spPr.ln);
-                                    ser.compiledSeriesPen = compiled_line;
-                                    for(var j = 0; j < pts.length; ++j) {
-                                        var oPointLine = null;
-                                        if(Array.isArray(ser.dPt)) {
-                                            for(var k = 0; k < ser.dPt.length; ++k) {
-                                                if(ser.dPt[k].idx === pts[j].idx) {
-                                                    if(ser.dPt[k].spPr) {
-                                                        oPointLine = ser.dPt[k].spPr.ln;
-                                                    }
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        if(oPointLine) {
-                                            compiled_line = ser.compiledSeriesPen.createDuplicate();
-                                            compiled_line.merge(oPointLine);
-                                        }
-                                        else {
-                                            compiled_line = ser.compiledSeriesPen;
-                                        }
-                                        pts[j].brush = null;
-                                        pts[j].pen = compiled_line;
-                                    }
-                                }
-                            }
-                            else {
-                                var base_fills = getArrayFillsFromBase(style.fill2, nMaxSeriesIdx);
-                                var base_line_fills = null;
-                                if(style.line1 === EFFECT_SUBTLE && this.style === 34)
-                                    base_line_fills = getArrayFillsFromBase(style.line2, nMaxSeriesIdx);
-                                for(var i = 0; i < series.length; ++i) {
-                                    var ser = series[i];
-                                    var compiled_brush = new AscFormat.CUniFill();
-                                    compiled_brush.merge(base_fills[ser.idx]);
-                                    if(ser.spPr && ser.spPr.Fill) {
-                                        compiled_brush.merge(ser.spPr.Fill);
-                                    }
-                                    ser.compiledSeriesBrush = compiled_brush;
-                                    ser.compiledSeriesBrush.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
-                                    var pts = ser.getNumPts();
-                                    for(var j = 0; j < pts.length; ++j) {
-                                        pts[j].brush = ser.compiledSeriesBrush;
-                                        if(Array.isArray(ser.dPt) && !(ser.getObjectType && ser.getObjectType() === AscDFH.historyitem_type_AreaSeries)) {
-                                            for(var k = 0; k < ser.dPt.length; ++k) {
-                                                if(ser.dPt[k].idx === pts[j].idx) {
-                                                    if(ser.dPt[k].spPr) {
-                                                        if(ser.dPt[k].spPr.Fill && ser.dPt[k].spPr.Fill.fill) {
-                                                            pts[j].brush = ser.dPt[k].spPr.Fill.createDuplicate();
-                                                            pts[j].brush.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
-                                                        }
-                                                    }
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-
-
-                                    //
-                                    {
-                                        default_line = new AscFormat.CLn();
-                                        if(style.line1 === EFFECT_NONE) {
-                                            default_line.w = 0;
-                                        }
-                                        else if(style.line1 === EFFECT_SUBTLE) {
-                                            default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[0]);
-                                        }
-                                        else if(style.line1 === EFFECT_MODERATE) {
-                                            default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[1]);
-                                        }
-                                        else if(style.line1 === EFFECT_INTENSE) {
-                                            default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[2]);
-                                        }
-                                        var base_line_fills;
-                                        if(this.style === 34)
-                                            base_line_fills = getArrayFillsFromBase(style.line2, getMaxIdx(pts));
-
-
-                                        var compiled_line = new AscFormat.CLn();
-                                        compiled_line.merge(default_line);
-                                        compiled_line.Fill = new AscFormat.CUniFill();
-                                        if(this.style !== 34)
-                                            compiled_line.Fill.merge(style.line2[0]);
-                                        else
-                                            compiled_line.Fill.merge(base_line_fills[ser.idx]);
-                                        if(ser.spPr && ser.spPr.ln) {
-                                            compiled_line.merge(ser.spPr.ln);
-                                        }
-                                        ser.compiledSeriesPen = compiled_line;
-                                        ser.compiledSeriesPen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
-                                        for(var j = 0; j < pts.length; ++j) {
-                                            if(Array.isArray(ser.dPt) && !(ser.getObjectType && ser.getObjectType() === AscDFH.historyitem_type_AreaSeries)) {
-                                                for(var k = 0; k < ser.dPt.length; ++k) {
-                                                    if(ser.dPt[k].idx === pts[j].idx) {
-                                                        if(ser.dPt[k].spPr) {
-                                                            compiled_line = ser.compiledSeriesPen.createDuplicate();
-                                                            compiled_line.merge(ser.dPt[k].spPr.ln);
-                                                            pts[j].pen = compiled_line;
-                                                            pts[j].pen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
-                                                        }
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            if(pts[j].compiledMarker) {
-                                                pts[j].compiledMarker.pen && pts[j].compiledMarker.pen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
-                                                pts[j].compiledMarker.brush && pts[j].compiledMarker.brush.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            break;
-                        }
-                        case AscDFH.historyitem_type_ScatterChart:
-                        {
-                            var base_line_fills = getArrayFillsFromBase(style.line4, nMaxSeriesIdx);
+                    var nChartType = oChart.getObjectType();
+                    if(nChartType === AscDFH.historyitem_type_LineChart ||
+                        (nChartType === AscDFH.historyitem_type_RadarChart && (oChart.radarStyle === AscFormat.RADAR_STYLE_STANDARD || oChart.radarStyle === AscFormat.RADAR_STYLE_MARKER))) {
+                        var base_line_fills = getArrayFillsFromBase(style.line4, nMaxSeriesIdx);
+                        if(!AscFormat.CChartsDrawer.prototype._isSwitchCurrent3DChart(this)) {
                             for(var i = 0; i < series.length; ++i) {
                                 var default_line = parents.theme.themeElements.fmtScheme.lnStyleLst[0];
                                 var ser = series[i];
                                 var pts = ser.getNumPts();
                                 this.ptsCount += pts.length;
-                                if(oChart.scatterStyle === AscFormat.SCATTER_STYLE_SMOOTH || oChart.scatterStyle === AscFormat.SCATTER_STYLE_SMOOTH_MARKER) {
-                                    if(!AscFormat.isRealBool(ser.smooth)) {
-                                        ser.smooth = true;
-                                    }
-                                }
-                                if(oChart.scatterStyle === AscFormat.SCATTER_STYLE_MARKER || oChart.scatterStyle === AscFormat.SCATTER_STYLE_NONE) {
-                                    default_line = new AscFormat.CLn();
-                                    default_line.setFill(new AscFormat.CUniFill());
-                                    default_line.Fill.setFill(new AscFormat.CNoFill());
-                                }
                                 var compiled_line = new AscFormat.CLn();
                                 compiled_line.merge(default_line);
-                                if(!(oChart.scatterStyle === AscFormat.SCATTER_STYLE_MARKER || oChart.scatterStyle === AscFormat.SCATTER_STYLE_NONE)) {
-                                    compiled_line.Fill && compiled_line.Fill.merge(base_line_fills[ser.idx]);
-                                }
+                                compiled_line.Fill && compiled_line.Fill.merge(base_line_fills[ser.idx]);
                                 compiled_line.w *= style.line3;
                                 if(ser.spPr && ser.spPr.ln)
                                     compiled_line.merge(ser.spPr.ln);
                                 ser.compiledSeriesPen = compiled_line;
                                 for(var j = 0; j < pts.length; ++j) {
-                                    pts[j].brush = null;
-                                    pts[j].pen = ser.compiledSeriesPen;
+                                    var oPointLine = null;
                                     if(Array.isArray(ser.dPt)) {
                                         for(var k = 0; k < ser.dPt.length; ++k) {
                                             if(ser.dPt[k].idx === pts[j].idx) {
                                                 if(ser.dPt[k].spPr) {
-                                                    pts[j].pen = ser.compiledSeriesPen.createDuplicate();
-                                                    pts[j].pen.merge(ser.dPt[k].spPr.ln);
-                                                    pts[j].pen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
+                                                    oPointLine = ser.dPt[k].spPr.ln;
                                                 }
                                                 break;
                                             }
                                         }
                                     }
-                                }
-                            }
-                            break;
-                        }
-                        case AscDFH.historyitem_type_SurfaceChart:
-                        {
-                            var oSurfaceChart = oChart;
-                            var aValAxArray = this.getValAxisValues();
-                            var nFmtsCount = aValAxArray.length - 1;
-                            var oSpPr, oBandFmt, oCompiledBandFmt;
-                            oSurfaceChart.compiledBandFormats.length = 0;
-                            var multiplier;
-                            var axis_by_types = oSurfaceChart.getAxisByTypes();
-                            var val_ax = axis_by_types.valAx[0];
-                            if(val_ax.dispUnits)
-                                multiplier = val_ax.dispUnits.getMultiplier();
-                            else
-                                multiplier = 1;
-                            var num_fmt = val_ax.numFmt, num_format = null, calc_value, rich_value;
-                            if(num_fmt && typeof num_fmt.formatCode === "string" /*&& !(num_fmt.formatCode === "General")*/) {
-                                num_format = oNumFormatCache.get(num_fmt.formatCode);
-                            }
-                            var oParentObjects = this.getParentObjects();
-                            var RGBA = {R: 255, G: 255, B: 255, A: 255};
-                            if(oSurfaceChart.isWireframe()) {
-                                var base_line_fills = getArrayFillsFromBase(style.line4, nFmtsCount);
-                                var default_line = parents.theme.themeElements.fmtScheme.lnStyleLst[0];
-                                for(var i = 0; i < nFmtsCount; ++i) {
-                                    oBandFmt = oSurfaceChart.getBandFmtByIndex(i);
-                                    oSpPr = new AscFormat.CSpPr();
-                                    oSpPr.setFill(AscFormat.CreateNoFillUniFill());
-                                    var compiled_line = new AscFormat.CLn();
-                                    compiled_line.merge(default_line);
-                                    compiled_line.Fill.merge(base_line_fills[i]);
-                                    //compiled_line.w *= style.line3;
-                                    compiled_line.Join = new AscFormat.LineJoin();
-                                    compiled_line.Join.type = AscFormat.LineJoinType.Bevel;
-                                    if(oBandFmt && oBandFmt.spPr) {
-                                        compiled_line.merge(oBandFmt.spPr.ln);
-                                    }
-                                    compiled_line.calculate(oParentObjects.theme, oParentObjects.slide, oParentObjects.layout, oParentObjects.master, RGBA, this.clrMapOvr);
-                                    oSpPr.setLn(compiled_line);
-                                    oCompiledBandFmt = new AscFormat.CBandFmt();
-                                    oCompiledBandFmt.setIdx(i);
-                                    oCompiledBandFmt.setSpPr(oSpPr);
-
-
-                                    if(num_format) {
-                                        oCompiledBandFmt.startValue = num_format.formatToChart(aValAxArray[i] * multiplier);
-                                        oCompiledBandFmt.endValue = num_format.formatToChart(aValAxArray[i + 1] * multiplier);
-
+                                    if(oPointLine) {
+                                        compiled_line = ser.compiledSeriesPen.createDuplicate();
+                                        compiled_line.merge(oPointLine);
                                     }
                                     else {
-                                        oCompiledBandFmt.startValue = '' + (aValAxArray[i] * multiplier);
-                                        oCompiledBandFmt.endValue = '' + (aValAxArray[i + 1] * multiplier);
+                                        compiled_line = ser.compiledSeriesPen;
                                     }
-                                    oCompiledBandFmt.setSpPr(oSpPr);
-                                    oSurfaceChart.compiledBandFormats.push(oCompiledBandFmt);
+                                    pts[j].brush = null;
+                                    pts[j].pen = compiled_line;
                                 }
                             }
-                            else {
-                                var base_fills = getArrayFillsFromBase(style.fill2, nFmtsCount);
-                                var base_line_fills = null;
-                                if(style.line1 === EFFECT_SUBTLE && this.style === 34)
-                                    base_line_fills = getArrayFillsFromBase(style.line2, nFmtsCount);
-
-                                var default_line = new AscFormat.CLn();
-                                if(style.line1 === EFFECT_NONE) {
-                                    default_line.w = 0;
-                                }
-                                else if(style.line1 === EFFECT_SUBTLE) {
-                                    default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[0]);
-                                }
-                                else if(style.line1 === EFFECT_MODERATE) {
-                                    default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[1]);
-                                }
-                                else if(style.line1 === EFFECT_INTENSE) {
-                                    default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[2]);
-                                }
-
-                                for(var i = 0; i < nFmtsCount; ++i) {
-                                    oBandFmt = oSurfaceChart.getBandFmtByIndex(i);
-                                    var compiled_brush = new AscFormat.CUniFill();
-                                    oSpPr = new AscFormat.CSpPr();
-                                    compiled_brush.merge(base_fills[i]);
-                                    if(oBandFmt && oBandFmt.spPr) {
-                                        compiled_brush.merge(oBandFmt.spPr.Fill);
-                                    }
-                                    oSpPr.setFill(compiled_brush);
-
-                                    var compiled_line = new AscFormat.CLn();
-                                    compiled_line.merge(default_line);
-                                    compiled_line.Fill = new AscFormat.CUniFill();
-                                    if(this.style !== 34)
-                                        compiled_line.Fill.merge(style.line2[0]);
-                                    else
-                                        compiled_line.Fill.merge(base_line_fills[i]);
-                                    if(oBandFmt && oBandFmt.spPr && oBandFmt.spPr.ln) {
-                                        compiled_line.merge(oBandFmt.spPr.ln);
-                                    }
-                                    oSpPr.setLn(compiled_line);
-                                    compiled_line.calculate(oParentObjects.theme, oParentObjects.slide, oParentObjects.layout, oParentObjects.master, RGBA, this.clrMapOvr);
-                                    compiled_brush.calculate(oParentObjects.theme, oParentObjects.slide, oParentObjects.layout, oParentObjects.master, RGBA, this.clrMapOvr);
-                                    oCompiledBandFmt = new AscFormat.CBandFmt();
-                                    oCompiledBandFmt.setIdx(i);
-                                    oCompiledBandFmt.setSpPr(oSpPr);
-                                    if(num_format) {
-                                        oCompiledBandFmt.startValue = num_format.formatToChart(aValAxArray[i] * multiplier);
-                                        oCompiledBandFmt.endValue = num_format.formatToChart(aValAxArray[i + 1] * multiplier);
-
-                                    }
-                                    else {
-                                        oCompiledBandFmt.startValue = '' + (aValAxArray[i] * multiplier);
-                                        oCompiledBandFmt.endValue = '' + (aValAxArray[i + 1] * multiplier);
-                                    }
-                                    oSurfaceChart.compiledBandFormats.push(oCompiledBandFmt);
-                                }
-                            }
-                            break;
                         }
-                        default :
-                        {
+                        else {
                             var base_fills = getArrayFillsFromBase(style.fill2, nMaxSeriesIdx);
                             var base_line_fills = null;
                             if(style.line1 === EFFECT_SUBTLE && this.style === 34)
@@ -7733,9 +7476,9 @@ var GLOBAL_PATH_COUNT = 0;
                                 if(ser.spPr && ser.spPr.Fill) {
                                     compiled_brush.merge(ser.spPr.Fill);
                                 }
-                                ser.compiledSeriesBrush = compiled_brush.createDuplicate();
+                                ser.compiledSeriesBrush = compiled_brush;
+                                ser.compiledSeriesBrush.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
                                 var pts = ser.getNumPts();
-                                this.ptsCount += pts.length;
                                 for(var j = 0; j < pts.length; ++j) {
                                     pts[j].brush = ser.compiledSeriesBrush;
                                     if(Array.isArray(ser.dPt) && !(ser.getObjectType && ser.getObjectType() === AscDFH.historyitem_type_AreaSeries)) {
@@ -7743,8 +7486,8 @@ var GLOBAL_PATH_COUNT = 0;
                                             if(ser.dPt[k].idx === pts[j].idx) {
                                                 if(ser.dPt[k].spPr) {
                                                     if(ser.dPt[k].spPr.Fill && ser.dPt[k].spPr.Fill.fill) {
-                                                        compiled_brush = ser.dPt[k].spPr.Fill.createDuplicate();
-                                                        pts[j].brush = compiled_brush;
+                                                        pts[j].brush = ser.dPt[k].spPr.Fill.createDuplicate();
+                                                        pts[j].brush.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
                                                     }
                                                 }
                                                 break;
@@ -7784,10 +7527,9 @@ var GLOBAL_PATH_COUNT = 0;
                                     if(ser.spPr && ser.spPr.ln) {
                                         compiled_line.merge(ser.spPr.ln);
                                     }
-                                    ser.compiledSeriesPen = compiled_line.createDuplicate();
+                                    ser.compiledSeriesPen = compiled_line;
                                     ser.compiledSeriesPen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
                                     for(var j = 0; j < pts.length; ++j) {
-                                        pts[j].pen = ser.compiledSeriesPen;
                                         if(Array.isArray(ser.dPt) && !(ser.getObjectType && ser.getObjectType() === AscDFH.historyitem_type_AreaSeries)) {
                                             for(var k = 0; k < ser.dPt.length; ++k) {
                                                 if(ser.dPt[k].idx === pts[j].idx) {
@@ -7795,15 +7537,261 @@ var GLOBAL_PATH_COUNT = 0;
                                                         compiled_line = ser.compiledSeriesPen.createDuplicate();
                                                         compiled_line.merge(ser.dPt[k].spPr.ln);
                                                         pts[j].pen = compiled_line;
+                                                        pts[j].pen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
                                                     }
                                                     break;
                                                 }
                                             }
                                         }
+                                        if(pts[j].compiledMarker) {
+                                            pts[j].compiledMarker.pen && pts[j].compiledMarker.pen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
+                                            pts[j].compiledMarker.brush && pts[j].compiledMarker.brush.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
+                                        }
                                     }
                                 }
                             }
-                            break;
+                        }
+                    }
+                    else if(nChartType === AscDFH.historyitem_type_ScatterChart) {
+                        var base_line_fills = getArrayFillsFromBase(style.line4, nMaxSeriesIdx);
+                        for(var i = 0; i < series.length; ++i) {
+                            var default_line = parents.theme.themeElements.fmtScheme.lnStyleLst[0];
+                            var ser = series[i];
+                            var pts = ser.getNumPts();
+                            this.ptsCount += pts.length;
+                            if(oChart.scatterStyle === AscFormat.SCATTER_STYLE_SMOOTH || oChart.scatterStyle === AscFormat.SCATTER_STYLE_SMOOTH_MARKER) {
+                                if(!AscFormat.isRealBool(ser.smooth)) {
+                                    ser.smooth = true;
+                                }
+                            }
+                            if(oChart.scatterStyle === AscFormat.SCATTER_STYLE_MARKER || oChart.scatterStyle === AscFormat.SCATTER_STYLE_NONE) {
+                                default_line = new AscFormat.CLn();
+                                default_line.setFill(new AscFormat.CUniFill());
+                                default_line.Fill.setFill(new AscFormat.CNoFill());
+                            }
+                            var compiled_line = new AscFormat.CLn();
+                            compiled_line.merge(default_line);
+                            if(!(oChart.scatterStyle === AscFormat.SCATTER_STYLE_MARKER || oChart.scatterStyle === AscFormat.SCATTER_STYLE_NONE)) {
+                                compiled_line.Fill && compiled_line.Fill.merge(base_line_fills[ser.idx]);
+                            }
+                            compiled_line.w *= style.line3;
+                            if(ser.spPr && ser.spPr.ln)
+                                compiled_line.merge(ser.spPr.ln);
+                            ser.compiledSeriesPen = compiled_line;
+                            for(var j = 0; j < pts.length; ++j) {
+                                pts[j].brush = null;
+                                pts[j].pen = ser.compiledSeriesPen;
+                                if(Array.isArray(ser.dPt)) {
+                                    for(var k = 0; k < ser.dPt.length; ++k) {
+                                        if(ser.dPt[k].idx === pts[j].idx) {
+                                            if(ser.dPt[k].spPr) {
+                                                pts[j].pen = ser.compiledSeriesPen.createDuplicate();
+                                                pts[j].pen.merge(ser.dPt[k].spPr.ln);
+                                                pts[j].pen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if(nChartType === AscDFH.historyitem_type_SurfaceChart) {
+                        var oSurfaceChart = oChart;
+                        var aValAxArray = this.getValAxisValues();
+                        var nFmtsCount = aValAxArray.length - 1;
+                        var oSpPr, oBandFmt, oCompiledBandFmt;
+                        oSurfaceChart.compiledBandFormats.length = 0;
+                        var multiplier;
+                        var axis_by_types = oSurfaceChart.getAxisByTypes();
+                        var val_ax = axis_by_types.valAx[0];
+                        if(val_ax.dispUnits)
+                            multiplier = val_ax.dispUnits.getMultiplier();
+                        else
+                            multiplier = 1;
+                        var num_fmt = val_ax.numFmt, num_format = null, calc_value, rich_value;
+                        if(num_fmt && typeof num_fmt.formatCode === "string" /*&& !(num_fmt.formatCode === "General")*/) {
+                            num_format = oNumFormatCache.get(num_fmt.formatCode);
+                        }
+                        var oParentObjects = this.getParentObjects();
+                        var RGBA = {R: 255, G: 255, B: 255, A: 255};
+                        if(oSurfaceChart.isWireframe()) {
+                            var base_line_fills = getArrayFillsFromBase(style.line4, nFmtsCount);
+                            var default_line = parents.theme.themeElements.fmtScheme.lnStyleLst[0];
+                            for(var i = 0; i < nFmtsCount; ++i) {
+                                oBandFmt = oSurfaceChart.getBandFmtByIndex(i);
+                                oSpPr = new AscFormat.CSpPr();
+                                oSpPr.setFill(AscFormat.CreateNoFillUniFill());
+                                var compiled_line = new AscFormat.CLn();
+                                compiled_line.merge(default_line);
+                                compiled_line.Fill.merge(base_line_fills[i]);
+                                //compiled_line.w *= style.line3;
+                                compiled_line.Join = new AscFormat.LineJoin();
+                                compiled_line.Join.type = AscFormat.LineJoinType.Bevel;
+                                if(oBandFmt && oBandFmt.spPr) {
+                                    compiled_line.merge(oBandFmt.spPr.ln);
+                                }
+                                compiled_line.calculate(oParentObjects.theme, oParentObjects.slide, oParentObjects.layout, oParentObjects.master, RGBA, this.clrMapOvr);
+                                oSpPr.setLn(compiled_line);
+                                oCompiledBandFmt = new AscFormat.CBandFmt();
+                                oCompiledBandFmt.setIdx(i);
+                                oCompiledBandFmt.setSpPr(oSpPr);
+
+
+                                if(num_format) {
+                                    oCompiledBandFmt.startValue = num_format.formatToChart(aValAxArray[i] * multiplier);
+                                    oCompiledBandFmt.endValue = num_format.formatToChart(aValAxArray[i + 1] * multiplier);
+
+                                }
+                                else {
+                                    oCompiledBandFmt.startValue = '' + (aValAxArray[i] * multiplier);
+                                    oCompiledBandFmt.endValue = '' + (aValAxArray[i + 1] * multiplier);
+                                }
+                                oCompiledBandFmt.setSpPr(oSpPr);
+                                oSurfaceChart.compiledBandFormats.push(oCompiledBandFmt);
+                            }
+                        }
+                        else {
+                            var base_fills = getArrayFillsFromBase(style.fill2, nFmtsCount);
+                            var base_line_fills = null;
+                            if(style.line1 === EFFECT_SUBTLE && this.style === 34)
+                                base_line_fills = getArrayFillsFromBase(style.line2, nFmtsCount);
+
+                            var default_line = new AscFormat.CLn();
+                            if(style.line1 === EFFECT_NONE) {
+                                default_line.w = 0;
+                            }
+                            else if(style.line1 === EFFECT_SUBTLE) {
+                                default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[0]);
+                            }
+                            else if(style.line1 === EFFECT_MODERATE) {
+                                default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[1]);
+                            }
+                            else if(style.line1 === EFFECT_INTENSE) {
+                                default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[2]);
+                            }
+
+                            for(var i = 0; i < nFmtsCount; ++i) {
+                                oBandFmt = oSurfaceChart.getBandFmtByIndex(i);
+                                var compiled_brush = new AscFormat.CUniFill();
+                                oSpPr = new AscFormat.CSpPr();
+                                compiled_brush.merge(base_fills[i]);
+                                if(oBandFmt && oBandFmt.spPr) {
+                                    compiled_brush.merge(oBandFmt.spPr.Fill);
+                                }
+                                oSpPr.setFill(compiled_brush);
+
+                                var compiled_line = new AscFormat.CLn();
+                                compiled_line.merge(default_line);
+                                compiled_line.Fill = new AscFormat.CUniFill();
+                                if(this.style !== 34)
+                                    compiled_line.Fill.merge(style.line2[0]);
+                                else
+                                    compiled_line.Fill.merge(base_line_fills[i]);
+                                if(oBandFmt && oBandFmt.spPr && oBandFmt.spPr.ln) {
+                                    compiled_line.merge(oBandFmt.spPr.ln);
+                                }
+                                oSpPr.setLn(compiled_line);
+                                compiled_line.calculate(oParentObjects.theme, oParentObjects.slide, oParentObjects.layout, oParentObjects.master, RGBA, this.clrMapOvr);
+                                compiled_brush.calculate(oParentObjects.theme, oParentObjects.slide, oParentObjects.layout, oParentObjects.master, RGBA, this.clrMapOvr);
+                                oCompiledBandFmt = new AscFormat.CBandFmt();
+                                oCompiledBandFmt.setIdx(i);
+                                oCompiledBandFmt.setSpPr(oSpPr);
+                                if(num_format) {
+                                    oCompiledBandFmt.startValue = num_format.formatToChart(aValAxArray[i] * multiplier);
+                                    oCompiledBandFmt.endValue = num_format.formatToChart(aValAxArray[i + 1] * multiplier);
+
+                                }
+                                else {
+                                    oCompiledBandFmt.startValue = '' + (aValAxArray[i] * multiplier);
+                                    oCompiledBandFmt.endValue = '' + (aValAxArray[i + 1] * multiplier);
+                                }
+                                oSurfaceChart.compiledBandFormats.push(oCompiledBandFmt);
+                            }
+                        }
+                    }
+                    else {
+
+                        var base_fills = getArrayFillsFromBase(style.fill2, nMaxSeriesIdx);
+                        var base_line_fills = null;
+                        if(style.line1 === EFFECT_SUBTLE && this.style === 34)
+                            base_line_fills = getArrayFillsFromBase(style.line2, nMaxSeriesIdx);
+                        for(var i = 0; i < series.length; ++i) {
+                            var ser = series[i];
+                            var compiled_brush = new AscFormat.CUniFill();
+                            compiled_brush.merge(base_fills[ser.idx]);
+                            if(ser.spPr && ser.spPr.Fill) {
+                                compiled_brush.merge(ser.spPr.Fill);
+                            }
+                            ser.compiledSeriesBrush = compiled_brush.createDuplicate();
+                            var pts = ser.getNumPts();
+                            this.ptsCount += pts.length;
+                            for(var j = 0; j < pts.length; ++j) {
+                                pts[j].brush = ser.compiledSeriesBrush;
+                                if(Array.isArray(ser.dPt) && !(ser.getObjectType && ser.getObjectType() === AscDFH.historyitem_type_AreaSeries)) {
+                                    for(var k = 0; k < ser.dPt.length; ++k) {
+                                        if(ser.dPt[k].idx === pts[j].idx) {
+                                            if(ser.dPt[k].spPr) {
+                                                if(ser.dPt[k].spPr.Fill && ser.dPt[k].spPr.Fill.fill) {
+                                                    compiled_brush = ser.dPt[k].spPr.Fill.createDuplicate();
+                                                    pts[j].brush = compiled_brush;
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+
+                            //
+                            {
+                                default_line = new AscFormat.CLn();
+                                if(style.line1 === EFFECT_NONE) {
+                                    default_line.w = 0;
+                                }
+                                else if(style.line1 === EFFECT_SUBTLE) {
+                                    default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[0]);
+                                }
+                                else if(style.line1 === EFFECT_MODERATE) {
+                                    default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[1]);
+                                }
+                                else if(style.line1 === EFFECT_INTENSE) {
+                                    default_line.merge(parents.theme.themeElements.fmtScheme.lnStyleLst[2]);
+                                }
+                                var base_line_fills;
+                                if(this.style === 34)
+                                    base_line_fills = getArrayFillsFromBase(style.line2, getMaxIdx(pts));
+
+
+                                var compiled_line = new AscFormat.CLn();
+                                compiled_line.merge(default_line);
+                                compiled_line.Fill = new AscFormat.CUniFill();
+                                if(this.style !== 34)
+                                    compiled_line.Fill.merge(style.line2[0]);
+                                else
+                                    compiled_line.Fill.merge(base_line_fills[ser.idx]);
+                                if(ser.spPr && ser.spPr.ln) {
+                                    compiled_line.merge(ser.spPr.ln);
+                                }
+                                ser.compiledSeriesPen = compiled_line.createDuplicate();
+                                ser.compiledSeriesPen.calculate(parents.theme, parents.slide, parents.layout, parents.master, RGBA, this.clrMapOvr);
+                                for(var j = 0; j < pts.length; ++j) {
+                                    pts[j].pen = ser.compiledSeriesPen;
+                                    if(Array.isArray(ser.dPt) && !(ser.getObjectType && ser.getObjectType() === AscDFH.historyitem_type_AreaSeries)) {
+                                        for(var k = 0; k < ser.dPt.length; ++k) {
+                                            if(ser.dPt[k].idx === pts[j].idx) {
+                                                if(ser.dPt[k].spPr) {
+                                                    compiled_line = ser.compiledSeriesPen.createDuplicate();
+                                                    compiled_line.merge(ser.dPt[k].spPr.ln);
+                                                    pts[j].pen = compiled_line;
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

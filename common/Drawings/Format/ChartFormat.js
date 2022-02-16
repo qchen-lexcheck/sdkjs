@@ -11642,7 +11642,7 @@
         this.radarStyle = pr;
     };
     CRadarChart.prototype.isMarkerChart = function() {
-        return false;
+        return this.radarStyle === AscFormat.RADAR_STYLE_MARKER;
     };
 
     function CRadarSeries() {
