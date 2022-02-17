@@ -3077,6 +3077,11 @@ ParaMath.prototype.Get_StartPos = function(ContentPos, Depth)
     this.Root.Get_StartPos(ContentPos, Depth);
 };
 
+ParaMath.prototype.Get_CurPos = function(ContentPos, Depth)
+{
+    this.Root.Get_CurPos(ContentPos, Depth);
+};
+
 ParaMath.prototype.Get_EndPos = function(BehindEnd, ContentPos, Depth)
 {
     this.Root.Get_EndPos(BehindEnd, ContentPos, Depth);

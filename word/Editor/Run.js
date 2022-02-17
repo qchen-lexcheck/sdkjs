@@ -7798,6 +7798,11 @@ ParaRun.prototype.Get_StartPos = function(ContentPos, Depth)
     ContentPos.Update( 0, Depth );
 };
 
+ParaRun.prototype.Get_CurPos = function(ContentPos, Depth)
+{
+    ContentPos.Update( this.CurPos, Depth );
+};
+
 ParaRun.prototype.Get_EndPos = function(BehindEnd, ContentPos, Depth)
 {
     var ContentLen = this.Content.length;

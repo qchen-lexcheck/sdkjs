@@ -4044,6 +4044,11 @@ CMathContent.prototype.Get_StartPos = function(ContentPos, Depth)
     ContentPos.Update(0, Depth);
     this.Content[0].Get_StartPos(ContentPos, Depth + 1);
 };
+CMathContent.prototype.Get_CurPos = function(ContentPos, Depth)
+{
+    ContentPos.Update(this.CurPos, Depth);
+    this.Content[0].Get_StartPos(ContentPos, Depth + 1);
+};
 CMathContent.prototype.Get_EndPos = function(BehindEnd, ContentPos, Depth)
 {
     var nLastPos = this.Content.length - 1;

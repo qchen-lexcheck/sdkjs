@@ -1061,13 +1061,13 @@ CParagraphContentWithContentBase.prototype.SelectThisElement = function(nDirecti
 
 	if (nDirection > 0)
 	{
-		this.Get_StartPos(StartPos, StartPos.Get_Depth() + 1);
-		this.Get_EndPos(true, EndPos, EndPos.Get_Depth() + 1);
+		this.Get_CurPos(StartPos, StartPos.Get_Depth() + 1);
+		this.Get_CurPos(EndPos, EndPos.Get_Depth() + 1);
 	}
 	else
 	{
-		this.Get_StartPos(EndPos, EndPos.Get_Depth() + 1);
-		this.Get_EndPos(true, StartPos, StartPos.Get_Depth() + 1);
+		this.Get_CurPos(EndPos, EndPos.Get_Depth() + 1);
+		this.Get_CurPos(StartPos, StartPos.Get_Depth() + 1);
 	}
 
 	this.Paragraph.Selection.Use   = true;
@@ -3360,6 +3360,10 @@ CParagraphContentWithParagraphLikeContent.prototype.Set_SelectionContentPos = fu
         case -1: EndPos = this.Content.length - 1; break;
         case  0: EndPos = EndContentPos.Get(Depth); break;
     }
+
+	if (undefined === EndPos || undefined === StartPos) {
+		return
+	}
 
     // Удалим отметки о старом селекте
     if ( OldStartPos < StartPos && OldStartPos < EndPos )
