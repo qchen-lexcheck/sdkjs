@@ -1837,7 +1837,10 @@ CChartsDrawer.prototype =
 		}
 
 		//максимальное и минимальное значение(по документации excel)
-		var trueMinMax = this._getTrueMinMax(yMin, yMax, isStackedType, isScatter);
+		var isRadarChart = axis.parent.chart.getObjectType() === AscDFH.historyitem_type_RadarChart;
+		var isDefaultMinMax = isStackedType || isRadarChart;
+
+		var trueMinMax = this._getTrueMinMax(yMin, yMax, isDefaultMinMax, isScatter);
 
 		//TODO временная проверка для некорректных минимальных и максимальных значений
 		if (manualMax && manualMin && manualMax < manualMin) {
@@ -1891,7 +1894,11 @@ CChartsDrawer.prototype =
 		if (isNaN(step) || step === 0) {
 			arrayValues = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
 		} else {
-			arrayValues = this._getArrayDataValues(step, axisMin, axisMax, manualMin, manualMax);
+			if (isRadarChart) {
+				arrayValues = this._getRadarAxisValues(axisMin, axisMax, step);
+			} else {
+				arrayValues = this._getArrayDataValues(step, axisMin, axisMax, manualMin, manualMax);
+			}
 		}
 
 		//проверка на переход в другой диапазон из-за ограничения по высоте
@@ -2107,6 +2114,24 @@ CChartsDrawer.prototype =
 		}
 
 		return result;
+	},
+
+	_getRadarAxisValues: function (axisMin, axisMax, step) {
+		var arrayValues = [];
+
+		var maxPointsCount = 40;
+		for (var i = 0; i < maxPointsCount; i++) {
+			arrayValues[i] = axisMin + step * i;
+			if (arrayValues[i] >= axisMax) {
+				break;
+			}
+		}
+
+		if (!arrayValues.length) {
+			arrayValues = [0.2, 0.4, 0.6, 0.8, 1, 1.2];
+		}
+
+		return arrayValues;
 	},
 
 	_getArrayAxisValues: function (minUnit, axisMin, axisMax, step, manualMin, manualMax) {
@@ -4595,7 +4620,14 @@ CChartsDrawer.prototype =
 			var orientation = axis.scaling.orientation === AscFormat.ORIENTATION_MIN_MAX;
 			var trueWidth = this.calcProp.trueWidth;
 			var xCenter = (this.calcProp.chartGutter._left + trueWidth / 2) / this.calcProp.pxToMM;
-			var yCenter = orientation ? yPoints[0].pos : yPoints[yPoints.length - 1].pos;
+
+			var yCenter, trueHeight;
+			if (yPoints.length > 0) {
+				yCenter = orientation ? yPoints[0].pos : yPoints[yPoints.length - 1].pos;
+			} else {
+				trueHeight = this.calcProp.trueHeight;
+				yCenter = (this.calcProp.chartGutter._top + trueHeight / 2) / this.calcProp.pxToMM;
+			}
 
 			var ptCount = this.getNumCache(this.calcProp.series[0].val).ptCount;
 			var tempAngle = 2 * Math.PI / ptCount;
@@ -11667,7 +11699,7 @@ drawRadarChart.prototype = {
 			min = valueMinMax.min;
 			max = valueMinMax.max;
 
-			summValues = Math.abs(yPoints[0].val) + Math.abs(yPoints[yPoints.length - 1].val);
+			summValues = Math.abs(yPoints[0].val) + Math.abs(yPoints[yPoints.length - 1].val); // Math.abs(min) + Math.abs(max);//Math.abs(yPoints[0].val) + Math.abs(yPoints[yPoints.length - 1].val);
 		}
 
 		var tempAngle = 2 * Math.PI / numCache.length;
@@ -11912,8 +11944,6 @@ drawRadarChart.prototype = {
 	},
 
 	_drawLines: function () {
-		//var brush, pen, dataSeries, seria, markerBrush, markerPen, numCache;
-
 		//this.cShapeDrawer.Graphics.SaveGrState();
 		//this.cShapeDrawer.Graphics.AddClipRect(this.chartProp.chartGutter._left / this.chartProp.pxToMM, this.chartProp.chartGutter._top / this.chartProp.pxToMM, this.chartProp.trueWidth / this.chartProp.pxToMM, this.chartProp.trueHeight / this.chartProp.pxToMM);
 		if (this.radarStyle === AscFormat.RADAR_STYLE_FILLED) {
@@ -11924,51 +11954,6 @@ drawRadarChart.prototype = {
 			this.cChartDrawer.drawPaths(this.paths, this.chart.series, true);
 			this.cChartDrawer.drawPathsPoints(this.paths, this.chart.series);
 		}
-
-		// старый вариант отрисовки
-		// this.cChartDrawer.cShapeDrawer.Graphics.SaveGrState();
-		// this.cChartDrawer.cShapeDrawer.Graphics.AddClipRect(this.chartProp.chartGutter._left / this.chartProp.pxToMM, this.chartProp.chartGutter._top / this.chartProp.pxToMM, this.chartProp.trueWidth / this.chartProp.pxToMM, this.chartProp.trueHeight / this.chartProp.pxToMM);
-		//}
-		// for (var i = 0; i < this.chart.series.length; i++) {
-		// 	seria = this.chart.series[i];
-		// 	brush = seria.brush;
-		// 	pen = seria.pen;
-
-		// 	numCache = this.cChartDrawer.getNumCache(seria.val);
-		// 	if(!numCache) {
-		// 		continue;
-		// 	}
-
-		// 	dataSeries = numCache.pts;
-		// 	for (var n = 0; n < dataSeries.length - 1; n++) {
-		// 		if (numCache.pts[n].pen) {
-		// 			pen = numCache.pts[n].pen;
-		// 		}
-		// 		if (numCache.pts[n].brush) {
-		// 			brush = numCache.pts[n].brush;
-		// 		}
-
-		// 		this.cChartDrawer.drawPath(this.paths.series[i][n], pen, brush);
-		// 		if (n === dataSeries.length - 2 && this.paths.series[i][n + 1]) {
-		// 			this.cChartDrawer.drawPath(this.paths.series[i][n + 1], pen, brush);
-		// 		}
-		// 	}
-
-		// 	//draw point
-		// 	this.cChartDrawer.drawPathsPoints(this.paths, this.chart.series);
-		// 	// for (var k = 0; k < this.paths.points[i].length; k++) {
-		// 	// 	markerBrush = numCache.pts[k].compiledMarker.brush;
-		// 	// 	markerPen = numCache.pts[k].compiledMarker.pen;
-
-		// 	// 	//frame of point
-		// 	// 	if (this.paths.points[i][0].framePaths) {
-		// 	// 		this.cChartDrawer.drawPath(this.paths.points[i][k].framePaths, null, markerBrush, false);
-		// 	// 	}
-		// 	// 	//point
-		// 	// 	this.cChartDrawer.drawPath(this.paths.points[i][k].path, markerPen, markerBrush, true);
-		// 	// }
-		// }
-		//this.cShapeDrawer.Graphics.RestoreGrState();
 	},
 
 	_getYVal: function (n, i, valueMinMax) {
