@@ -11637,9 +11637,12 @@ drawRadarChart.prototype = {
 		this.valAx = this.cChartDrawer.getAxisFromAxId(this.chart.axId, AscDFH.historyitem_type_ValAx);
 
 		this._calculateLines();
+		if (this.radarStyle === AscFormat.RADAR_STYLE_FILLED) {
+			this._calculateLines(true);
+		}
 	},
 
-	_calculateLines: function () {
+	_calculateLines: function (fillPath) {
 		//соответствует подписям оси значений(OY)
 		var yPoints = this.valAx.yPoints;
 		var trueWidth = this.chartProp.trueWidth;
@@ -11647,37 +11650,28 @@ drawRadarChart.prototype = {
 		var xCenter = (this.chartProp.chartGutter._left + trueWidth / 2) / this.chartProp.pxToMM;
 		var yCenter = this.valAx.scaling.orientation === AscFormat.ORIENTATION_MIN_MAX ? yPoints[0].pos : yPoints[yPoints.length - 1].pos;//(this.chartProp.chartGutter._top + trueHeight / 2) / this.chartProp.pxToMM;
 
-		var y, y1, x, x1, val, nextVal, seria, dataSeries, min, max, xDiff;
+		var y, y1, x, x1, val, nextVal, seria, dataSeries, min, max;
 
 		var numCache = this.cChartDrawer.getNumCache(this.chart.series[0].val).pts;
 		if (!numCache) {
 			return;
 		}
 
-		var resPos, resVal, valueMinMax, summValues, maxRadius;
+		var valueMinMax, summValues, maxRadius;
 
 		if (yPoints && yPoints.length > 1) {
-			xDiff = yPoints[0].pos - yPoints[1].pos; //((maxRadius) / (yPoints.length / 2));
 
-			resPos = yPoints[0].pos - yPoints[1].pos;
-			resVal = Math.abs(yPoints[0].val - yPoints[1].val);
-
-			// if (yPoints[0].val < 0) {
-			// 	step = yPoints[0].val - yPoints[1].val;
-			// 	valueMinMax = this._getMinMaxValue();
-			// 	xDiff /= Math.abs(step);
-			// }
 			maxRadius = yPoints[0].pos - yPoints[yPoints.length - 1].pos;
-
 			valueMinMax = this._getMinMaxValue();
+
 			min = valueMinMax.min;
 			max = valueMinMax.max;
-			summValues = Math.abs(yPoints[0].val) + Math.abs(yPoints[yPoints.length - 1].val);//Math.abs(min) + Math.abs(max);
+
+			summValues = Math.abs(yPoints[0].val) + Math.abs(yPoints[yPoints.length - 1].val);
 		}
 
 		var tempAngle = 2 * Math.PI / numCache.length;
-		var radius, radius1, xFirst, yFirst;
-
+		var radius, radius1, xFirst, yFirst, calcPath, points;
 		for (var i = 0; i < this.chart.series.length; i++) {
 
 			seria = this.chart.series[i];
@@ -11696,7 +11690,7 @@ drawRadarChart.prototype = {
 				val = this._getYVal(n, i);
 
 				//точки находятся внутри диапазона
-				y = val * xDiff;
+				y = val * maxRadius;
 				x = xCenter;
 
 				radius = y;
@@ -11714,44 +11708,20 @@ drawRadarChart.prototype = {
 					this.paths.points[i][n] = this.cChartDrawer.calculatePoint(x, y, dataSeries[n].compiledMarker.size, dataSeries[n].compiledMarker.symbol);
 				}
 			} else {
-				var calculateFillPath = this._calculateFillPath();
-				var path, points;
+				if (fillPath) {
+					calcPath = this._calculateFillPath();
+				}
 				for (var n = 0; n < dataSeries.length - 1; n++) {
 					//рассчитываем значения
 					val = this._getYVal(n, i, valueMinMax);
 					nextVal = this._getYVal(n + 1, i, valueMinMax);
 
-					if (this.valAx.scaling.logBase && (val < 0 && nextVal < 0)) {
+					if (this.valAx.scaling.logBase && (val < 0)) {
 						break;
 					}
 
-					//точки находятся внутри диапазона
-
-					var diffVal = Math.abs(yPoints[yPoints.length - 1].val) - Math.abs(val); // yPoints.length - val;
-					var nextDiffVal = Math.abs(yPoints[yPoints.length - 1].val) - Math.abs(nextVal);// yPoints.length - nextVal;
-
-					// if (val <= 0) {
-					// 	y = 	yPoints[yPoints.length - 1].pos - Math.abs((diffVal / resVal) * resPos);
-					// 	y1 = 	yPoints[yPoints.length - 1].pos - Math.abs((nextDiffVal / resVal) * resPos);
-					// } else {
-					// 	y = yPoints[0].pos - Math.abs((diffVal / resVal) * resPos);
-					// 	y1 = yPoints[0].pos - Math.abs((nextDiffVal / resVal) * resPos);
-					// }
-					// y = yPoints[yPoints.length - 1].pos - (diffVal / resVal) * resPos;
-					// y1 = yPoints[yPoints.length - 1].pos - (nextDiffVal / resVal) * resPos;
-					//y = this.cChartDrawer.getYPosition(val, this.valAx, true); //		yPoints[0].pos - Math.abs((diffVal / resVal) * resPos);
-					//y1 = this.cChartDrawer.getYPosition(nextVal, this.valAx, true); //yPoints[0].pos - Math.abs((nextDiffVal / resVal) * resPos);
-
-					// y = val * resPos;
-					// y1 = nextVal * resPos;
-
 					y = (val / summValues) * maxRadius;
 					y1 = (nextVal / summValues) * maxRadius;
-					// y = yPoints[yPoints.length - 1].pos - (diffVal / resVal) * resPos;
-					// y1 = yPoints[yPoints.length - 1].pos - (nextDiffVal / resVal) * resPos;
-
-					// y = (yPoints[0].val - val) * resPos;//maxRadius;
-					// y1 = (yPoints[0].val - nextVal) * resPos;//maxRadius;
 
 					x = xCenter;
 					x1 = xCenter;
@@ -11766,43 +11736,43 @@ drawRadarChart.prototype = {
 					x1 = x1 + radius1 * Math.sin((n + 1) * tempAngle);
 
 					//AscFormat.RADAR_STYLE_MARKER AscFormat.RADAR_STYLE_FILLED  AscFormat.RADAR_STYLE_STANDARD
-					if (this.radarStyle === AscFormat.RADAR_STYLE_FILLED) {
+					if (fillPath) {
 						points = { x: x, y: y, x1: x1, y1: y1 };
-						path = calculateFillPath(dataSeries, n, points);
-					}
+						calcPath(dataSeries, n, points);
+					} else {
+						if (!this.paths.series) {
+							this.paths.series = [];
+						}
+						if (!this.paths.series[i]) {
+							this.paths.series[i] = [];
+						}
 
-					if (!this.paths.series) {
-						this.paths.series = [];
-					}
-					if (!this.paths.series[i]) {
-						this.paths.series[i] = [];
-					}
+						this.paths.series[i][n] = this._calculateLine(x, y, x1, y1);
 
-					this.paths.series[i][n] = path ? path : this._calculateLine(x, y, x1, y1);
-
-					if (n === 0) {
-						xFirst = x;
-						yFirst = y;
-					}
-
-
-					if (n === dataSeries.length - 2) {
-						this.paths.series[i][n + 1] = path ? path : this._calculateLine(x1, y1, xFirst, yFirst);
-					}
-
-					if (!this.paths.points) {
-						this.paths.points = [];
-					}
-					if (!this.paths.points[i]) {
-						this.paths.points[i] = [];
-					}
-
-					if (dataSeries[n].compiledMarker) {
 						if (n === 0) {
-							this.paths.points[i][n] = this.cChartDrawer.calculatePoint(x, y, dataSeries[n].compiledMarker.size, dataSeries[n].compiledMarker.symbol);
-							this.paths.points[i][n + 1] = this.cChartDrawer.calculatePoint(x1, y1, dataSeries[n + 1].compiledMarker.size, dataSeries[n + 1].compiledMarker.symbol);
-						} else {
-							this.paths.points[i][n + 1] = this.cChartDrawer.calculatePoint(x1, y1, dataSeries[n + 1].compiledMarker.size, dataSeries[n + 1].compiledMarker.symbol);
+							xFirst = x;
+							yFirst = y;
+						}
+
+
+						if (n === dataSeries.length - 2) {
+							this.paths.series[i][n + 1] = this._calculateLine(x1, y1, xFirst, yFirst);
+						}
+
+						if (!this.paths.points) {
+							this.paths.points = [];
+						}
+						if (!this.paths.points[i]) {
+							this.paths.points[i] = [];
+						}
+
+						if (dataSeries[n].compiledMarker) {
+							if (n === 0) {
+								this.paths.points[i][n] = this.cChartDrawer.calculatePoint(x, y, dataSeries[n].compiledMarker.size, dataSeries[n].compiledMarker.symbol);
+								this.paths.points[i][n + 1] = this.cChartDrawer.calculatePoint(x1, y1, dataSeries[n + 1].compiledMarker.size, dataSeries[n + 1].compiledMarker.symbol);
+							} else {
+								this.paths.points[i][n + 1] = this.cChartDrawer.calculatePoint(x1, y1, dataSeries[n + 1].compiledMarker.size, dataSeries[n + 1].compiledMarker.symbol);
+							}
 						}
 					}
 				}
@@ -11830,8 +11800,7 @@ drawRadarChart.prototype = {
 
 			if (dataSeries.length - 2 === n) {
 				pen = dataSeries[n].pen;
-				brush = new AscFormat.CUniFill();
-				brush.fill = pen.Fill.fill;
+				brush = dataSeries[n].brush;
 				t.fillPaths.push({ path: pathId, pen: pen, brush: brush });
 			}
 			return pathId;
@@ -11953,12 +11922,12 @@ drawRadarChart.prototype = {
 			}
 		} else {
 			this.cChartDrawer.drawPaths(this.paths, this.chart.series, true);
+			this.cChartDrawer.drawPathsPoints(this.paths, this.chart.series);
 		}
 
-		//TODO
+		// старый вариант отрисовки
 		// this.cChartDrawer.cShapeDrawer.Graphics.SaveGrState();
 		// this.cChartDrawer.cShapeDrawer.Graphics.AddClipRect(this.chartProp.chartGutter._left / this.chartProp.pxToMM, this.chartProp.chartGutter._top / this.chartProp.pxToMM, this.chartProp.trueWidth / this.chartProp.pxToMM, this.chartProp.trueHeight / this.chartProp.pxToMM);
-		//this.cChartDrawer.drawPaths(this.paths, this.chart.series, true);
 		//}
 		// for (var i = 0; i < this.chart.series.length; i++) {
 		// 	seria = this.chart.series[i];
