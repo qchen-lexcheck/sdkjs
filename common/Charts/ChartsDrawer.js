@@ -4584,10 +4584,46 @@ CChartsDrawer.prototype =
 		return path;
 	},
 
-	_getRadarGridLines: function (axis, chartProp) {
+	_getRadarGridLines: function (axis) {
+		var pathId = this.cChartSpace.AllocPath();
+		var path = this.cChartSpace.GetPath(pathId);
+		var pathH = this.calcProp.pathH;
+		var pathW = this.calcProp.pathW;
+
 		if (axis.getObjectType() === AscDFH.historyitem_type_ValAx) {
-			return null;
+			var yPoints = axis.yPoints;
+			var orientation = axis.scaling.orientation === AscFormat.ORIENTATION_MIN_MAX;
+			var trueWidth = this.calcProp.trueWidth;
+			var xCenter = (this.calcProp.chartGutter._left + trueWidth / 2) / this.calcProp.pxToMM;
+			var yCenter = orientation ? yPoints[0].pos : yPoints[yPoints.length - 1].pos;
+
+			var ptCount = this.getNumCache(this.calcProp.series[0].val).ptCount;
+			var tempAngle = 2 * Math.PI / ptCount;
+
+			var radius, x, y, firstX, firstY;
+			for (var i = 0; i < yPoints.length; i++) {
+				radius = yPoints[0].pos - yPoints[yPoints.length - (i + 1)].pos;
+				for (var n = 0; n < ptCount; n++) {
+
+					x = xCenter + radius * Math.sin(n * tempAngle);
+					if (orientation) {
+						y = yCenter - radius * Math.cos(n * tempAngle);
+					} else {
+						y = yCenter + radius * Math.cos(n * tempAngle);
+					}
+
+					if (n === 0) {
+						path.moveTo(x * pathW, y * pathH);
+						firstX = x;
+						firstY = y;
+					} else {
+						path.lnTo(x * pathW, y * pathH);
+					}
+				}
+				path.lnTo(firstX * pathW, firstY * pathH);
+			}
 		}
+		return { gridLines: pathId };
 	},
 
 	getAxisFromAxId: function(axId, type) {
@@ -11599,7 +11635,6 @@ drawRadarChart.prototype = {
 		this.paths = {};
 		this.radarStyle = this.chart.radarStyle;
 		this.valAx = this.cChartDrawer.getAxisFromAxId(this.chart.axId, AscDFH.historyitem_type_ValAx);
-		this.catAx = this.cChartDrawer.getAxisFromAxId(this.chart.axId, AscDFH.historyitem_type_CatAx);
 
 		this._calculateLines();
 	},
@@ -11612,21 +11647,32 @@ drawRadarChart.prototype = {
 		var xCenter = (this.chartProp.chartGutter._left + trueWidth / 2) / this.chartProp.pxToMM;
 		var yCenter = this.valAx.scaling.orientation === AscFormat.ORIENTATION_MIN_MAX ? yPoints[0].pos : yPoints[yPoints.length - 1].pos;//(this.chartProp.chartGutter._top + trueHeight / 2) / this.chartProp.pxToMM;
 
-		var y, y1, x, x1, val, nextVal, seria, dataSeries, valueMinMax, xDiff, step;
+		var y, y1, x, x1, val, nextVal, seria, dataSeries, min, max, xDiff;
 
 		var numCache = this.cChartDrawer.getNumCache(this.chart.series[0].val).pts;
 		if (!numCache) {
 			return;
 		}
 
+		var resPos, resVal, valueMinMax, summValues, maxRadius;
+
 		if (yPoints && yPoints.length > 1) {
 			xDiff = yPoints[0].pos - yPoints[1].pos; //((maxRadius) / (yPoints.length / 2));
 
-			if (yPoints[0].val < 0) {
-				step = yPoints[0].val - yPoints[1].val;
-				valueMinMax = this._getMinMaxValue();
-				xDiff /= Math.abs(step);
-			}
+			resPos = yPoints[0].pos - yPoints[1].pos;
+			resVal = Math.abs(yPoints[0].val - yPoints[1].val);
+
+			// if (yPoints[0].val < 0) {
+			// 	step = yPoints[0].val - yPoints[1].val;
+			// 	valueMinMax = this._getMinMaxValue();
+			// 	xDiff /= Math.abs(step);
+			// }
+			maxRadius = yPoints[0].pos - yPoints[yPoints.length - 1].pos;
+
+			valueMinMax = this._getMinMaxValue();
+			min = valueMinMax.min;
+			max = valueMinMax.max;
+			summValues = Math.abs(yPoints[0].val) + Math.abs(yPoints[yPoints.length - 1].val);//Math.abs(min) + Math.abs(max);
 		}
 
 		var tempAngle = 2 * Math.PI / numCache.length;
@@ -11675,10 +11721,37 @@ drawRadarChart.prototype = {
 					val = this._getYVal(n, i, valueMinMax);
 					nextVal = this._getYVal(n + 1, i, valueMinMax);
 
+					if (this.valAx.scaling.logBase && (val < 0 && nextVal < 0)) {
+						break;
+					}
+
 					//точки находятся внутри диапазона
 
-					y = val * xDiff;
-					y1 = nextVal * xDiff;
+					var diffVal = Math.abs(yPoints[yPoints.length - 1].val) - Math.abs(val); // yPoints.length - val;
+					var nextDiffVal = Math.abs(yPoints[yPoints.length - 1].val) - Math.abs(nextVal);// yPoints.length - nextVal;
+
+					// if (val <= 0) {
+					// 	y = 	yPoints[yPoints.length - 1].pos - Math.abs((diffVal / resVal) * resPos);
+					// 	y1 = 	yPoints[yPoints.length - 1].pos - Math.abs((nextDiffVal / resVal) * resPos);
+					// } else {
+					// 	y = yPoints[0].pos - Math.abs((diffVal / resVal) * resPos);
+					// 	y1 = yPoints[0].pos - Math.abs((nextDiffVal / resVal) * resPos);
+					// }
+					// y = yPoints[yPoints.length - 1].pos - (diffVal / resVal) * resPos;
+					// y1 = yPoints[yPoints.length - 1].pos - (nextDiffVal / resVal) * resPos;
+					//y = this.cChartDrawer.getYPosition(val, this.valAx, true); //		yPoints[0].pos - Math.abs((diffVal / resVal) * resPos);
+					//y1 = this.cChartDrawer.getYPosition(nextVal, this.valAx, true); //yPoints[0].pos - Math.abs((nextDiffVal / resVal) * resPos);
+
+					// y = val * resPos;
+					// y1 = nextVal * resPos;
+
+					y = (val / summValues) * maxRadius;
+					y1 = (nextVal / summValues) * maxRadius;
+					// y = yPoints[yPoints.length - 1].pos - (diffVal / resVal) * resPos;
+					// y1 = yPoints[yPoints.length - 1].pos - (nextDiffVal / resVal) * resPos;
+
+					// y = (yPoints[0].val - val) * resPos;//maxRadius;
+					// y1 = (yPoints[0].val - nextVal) * resPos;//maxRadius;
 
 					x = xCenter;
 					x1 = xCenter;
@@ -11766,29 +11839,24 @@ drawRadarChart.prototype = {
 	},
 
 	_getMinMaxValue: function () {
-		var temp = 0, res = 0, numCache;
-		var axisOrientation = this.valAx.scaling.orientation === AscFormat.ORIENTATION_MIN_MAX;
+		var temp = 0, resMax = 0, resMin = 0, numCache;
 		for (var i = 0; i < this.chart.series.length; i++) {
 			numCache = this.cChartDrawer.getNumCache(this.chart.series[i].val);
 			if (!numCache) {
 				continue;
 			}
 
-			for (var n = 0; n < numCache.pts.length - 1; n++) {
+			for (var n = 0; n < numCache.pts.length; n++) {
 				if (!numCache.pts[n]) {
 					continue;
 				}
 				temp = parseFloat(numCache.pts[n].val);
 
-				if (axisOrientation) {
-					res = temp < res ? temp : res;
-				} else {
-					res = temp > res ? temp : res;
-				}
-
+				resMin = temp < resMin ? temp : resMin;
+				resMax = temp > resMax ? temp : resMax;
 			}
 		}
-		return res;
+		return { min: resMin, max: resMax };
 	},
 
 	_calculateDLbl: function (chartSpace, ser, val) {
@@ -11935,20 +12003,50 @@ drawRadarChart.prototype = {
 	},
 
 	_getYVal: function (n, i, valueMinMax) {
-		var val = 0;
+		var val = 0, tempVal;
 		var numCache;
+		var yPoints = this.valAx.yPoints;
 
 		numCache = this.cChartDrawer.getNumCache(this.chart.series[i].val);
 		if (!numCache) {
 			return;
 		}
+		var orientation = this.valAx.scaling.orientation === AscFormat.ORIENTATION_MIN_MAX;
 
 		val = parseFloat(numCache.pts[n].val);
-		if (valueMinMax) {
-			if (this.valAx.scaling.orientation !== AscFormat.ORIENTATION_MIN_MAX) {
-				val -= Math.abs(valueMinMax);
-			} else {
-				val += Math.abs(valueMinMax);
+
+		tempVal = val;
+
+		var minValue;
+		if (orientation) {
+			minValue = Math.abs(yPoints[0].val) < Math.abs(valueMinMax.min) ? yPoints[0].val : valueMinMax.min;
+
+			val += Math.abs(minValue);
+			if (tempVal === minValue) {
+				val = 0;
+			}
+
+			if (yPoints[0].val > tempVal) {
+				if (tempVal < 0) {
+					val = tempVal - yPoints[0].val;
+				} else {
+					val = -(tempVal) - (yPoints[0].val + tempVal);
+				}
+			}
+		} else {
+			minValue = Math.abs(yPoints[yPoints.length - 1].val) < Math.abs(valueMinMax.max) ? yPoints[yPoints.length - 1].val : valueMinMax.max;
+			val -= Math.abs(minValue);
+
+			if (tempVal === minValue) {
+				val = 0;
+			}
+
+			if (yPoints[yPoints.length - 1].val < tempVal) {
+				if (tempVal > 0) {
+					val += tempVal - yPoints[yPoints.length - 1].val;
+				} else {
+					val = tempVal - (yPoints[yPoints.length - 1].val - tempVal);
+				}
 			}
 		}
 		return val;
@@ -14174,7 +14272,7 @@ axisChart.prototype = {
 
 		var paths;
 		if (this.axis.parent.chart.getObjectType() === AscDFH.historyitem_type_RadarChart) {
-			paths = this.cChartDrawer._getRadarGridLines(this.axis, this.chartProp);
+			paths = this.cChartDrawer._getRadarGridLines(this.axis);
 		} else {
 			if (this.axis.axPos === window['AscFormat'].AX_POS_L || this.axis.axPos === window['AscFormat'].AX_POS_R) {
 				//ось слева или справа, линии горизонтальные
