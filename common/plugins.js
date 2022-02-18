@@ -1051,10 +1051,17 @@
 						window.g_asc_plugins.api._beforeEvalCommand();
 
                         AscFonts.IsCheckSymbols = true;
-						var _script = "(function(){ var Api = window.g_asc_plugins.api;\n" + value.replace(/\\/g, "\\\\") + "\n})();";
+						// только надо убрать из макроса анонимную сомомызывающуюся функцию, иначе во вложенной функции будет доступен window через this
+						// либо сделать её стрелочной (но тогда проблема с ie)
+						var _script = "(function(Api, window, alert, document){" + value.replace(/\\/g, "\\\\") + "\n})" + ".call({}, window.g_asc_plugins.api, {}, function(){}, {});";
+						// как вариант лучше использовать new Function так как это быстрее должно работать
+						var f = new Function("Api", "window", "alert", "document", value.replace(/\\/g, "\\\\"));
+						var f2 = new Function("Api", "window", "alert", "document", value.replace(/\\/g, "\\\\")).bind({}, window.g_asc_plugins.api, {}, function(){}, {});
 						try
 						{
 							eval(_script);
+							f.call({}, window.g_asc_plugins.api, {}, function(){}, {});
+							f2();
 						}
 						catch (err)
 						{
