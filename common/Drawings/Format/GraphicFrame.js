@@ -488,11 +488,6 @@ CGraphicFrame.prototype.isShape = function()
         return false;
 };
 
-CGraphicFrame.prototype.isImage = function()
-    {
-        return false;
-};
-
 CGraphicFrame.prototype.isGroup = function()
     {
         return false;
@@ -506,6 +501,15 @@ CGraphicFrame.prototype.isChart = function()
 CGraphicFrame.prototype.isTable = function()
     {
         return this.graphicObject instanceof CTable;
+};
+
+CGraphicFrame.prototype.getTypeName = function() 
+{
+    if(this.isTable()) 
+    {
+        return AscCommon.translateManager.getValue("Table");
+    }
+    return AscFormat.CGraphicObjectBase.prototype.getTypeName.call(this)
 };
 
 CGraphicFrame.prototype.CanAddHyperlink = function(bCheck)
@@ -672,6 +676,37 @@ CGraphicFrame.prototype.IsHdrFtr = function(bool)
 
 	return false;
 };
+CGraphicFrame.prototype.resize = function(extX, extY)
+{
+    var newExtX = AscFormat.isRealNumber(extX) ? extX : this.extX;
+    var newExtY = AscFormat.isRealNumber(extY) ? extY : this.extY;
+    if(!AscFormat.fApproxEqual(newExtX, this.extX) || !AscFormat.fApproxEqual(newExtY, this.extY)) 
+    {
+        this.graphicObject.Resize(newExtX, newExtY);
+        this.recalculateTable();
+        this.recalculateSizes();
+        return true;
+    }
+    return false;
+};
+CGraphicFrame.prototype.setFrameTransform = function(oPr)
+{
+    var bResult = this.resize(oPr.FrameWidth, oPr.FrameHeight);
+    var newX = AscFormat.isRealNumber(oPr.FrameX) ? oPr.FrameX : this.x;
+    var newY = AscFormat.isRealNumber(oPr.FrameY) ? oPr.FrameY : this.y;
+    this.setNoChangeAspect(oPr.FrameLockAspect ? true : undefined);
+    if(!AscFormat.fApproxEqual(newX, this.x) || !AscFormat.fApproxEqual(newY, this.y)) 
+    {
+        AscFormat.CheckSpPrXfrm(this, true);
+        var xfrm = this.spPr.xfrm;
+        xfrm.setOffX(newX);
+        xfrm.setOffY(newY);
+        bResult = true;
+        this.recalculate();
+    }
+    return bResult;
+};
+
 CGraphicFrame.prototype.IsFootnote = function(bReturnFootnote)
 {
 	if (bReturnFootnote)

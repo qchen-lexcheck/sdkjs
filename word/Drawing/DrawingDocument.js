@@ -5639,11 +5639,37 @@ function CDrawingDocument()
 
 	this.SetDrawImagePlaceContents = function(id, props)
 	{
-		var _div_elem = null;
+		var drawingCanvas = null;
+		var widthPx = 0;
+		var heightPx = 0;
 
-		if (null == id || "" == id)
+		if (id && id["tagName"] === "CANVAS")
 		{
-			if ("" != this.GuiCanvasFillTOCParentId)
+			drawingCanvas = id;
+			widthPx = parseInt(drawingCanvas.style.width);
+			heightPx = parseInt(drawingCanvas.style.height);
+		}
+
+		if (!drawingCanvas)
+		{
+			var _div_elem = null;
+
+			if (null == id || "" == id)
+			{
+				if ("" != this.GuiCanvasFillTOCParentId)
+				{
+					_div_elem = document.getElementById(this.GuiCanvasFillTOCParentId);
+
+					if (this.GuiCanvasFillTOC && _div_elem)
+						_div_elem.removeChild(this.GuiCanvasFillTOC);
+
+					this.GuiCanvasFillTOCParentId = "";
+					this.GuiCanvasFillTOC = null;
+				}
+				return;
+			}
+
+			if (id != this.GuiCanvasFillTOCParentId)
 			{
 				_div_elem = document.getElementById(this.GuiCanvasFillTOCParentId);
 
@@ -5653,32 +5679,22 @@ function CDrawingDocument()
 				this.GuiCanvasFillTOCParentId = "";
 				this.GuiCanvasFillTOC = null;
 			}
-			return;
-		}
 
-		if (id != this.GuiCanvasFillTOCParentId)
-		{
+			this.GuiCanvasFillTOCParentId = id;
 			_div_elem = document.getElementById(this.GuiCanvasFillTOCParentId);
+			if (!_div_elem)
+				return;
 
-			if (this.GuiCanvasFillTOC && _div_elem)
-				_div_elem.removeChild(this.GuiCanvasFillTOC);
+			widthPx = _div_elem.offsetWidth;
+			heightPx = _div_elem.offsetHeight;
 
-			this.GuiCanvasFillTOCParentId = "";
-			this.GuiCanvasFillTOC = null;
-		}
+			if (null == this.GuiCanvasFillTOC)
+			{
+				this.GuiCanvasFillTOC = document.createElement('canvas');
+				_div_elem.appendChild(this.GuiCanvasFillTOC);
+			}
 
-		this.GuiCanvasFillTOCParentId = id;
-		_div_elem =  document.getElementById(this.GuiCanvasFillTOCParentId);
-		if (!_div_elem)
-			return;
-
-		var widthPx = _div_elem.offsetWidth;
-		var heightPx = _div_elem.offsetHeight;
-
-		if (null == this.GuiCanvasFillTOC)
-		{
-			this.GuiCanvasFillTOC = document.createElement('canvas');
-			_div_elem.appendChild(this.GuiCanvasFillTOC);
+			drawingCanvas = this.GuiCanvasFillTOC;
 		}
 
 		// draw!
@@ -5690,8 +5706,8 @@ function CDrawingDocument()
 		var wPxOffset = AscBrowser.convertToRetinaValue(8, true);
 		var wMmOffset = wPxOffset * g_dKoef_pix_to_mm / AscCommon.AscBrowser.retinaPixelRatio;
 
-		this.GuiCanvasFillTOC.style.width = widthPx + "px";
-		this.GuiCanvasFillTOC.width = wPx;
+		drawingCanvas.style.width = widthPx + "px";
+		drawingCanvas.width = wPx;
 
 		History.TurnOff();
 
@@ -5707,7 +5723,7 @@ function CDrawingDocument()
 		var _oldTurn = editor.isViewMode;
 		editor.isViewMode = true;
 
-		var ctx = this.GuiCanvasFillTOC.getContext('2d');
+		var ctx = drawingCanvas.getContext('2d');
 
 		var old_marks = this.m_oWordControl.m_oApi.ShowParaMarks;
 		this.m_oWordControl.m_oApi.ShowParaMarks = false;
@@ -5881,10 +5897,10 @@ function CDrawingDocument()
 			hMm = nContentHeight;
 		}
 
-		this.GuiCanvasFillTOC.style.height = AscBrowser.convertToRetinaValue(hPx, false) + "px";
-		this.GuiCanvasFillTOC.height = hPx;
+		drawingCanvas.style.height = AscBrowser.convertToRetinaValue(hPx, false) + "px";
+		drawingCanvas.height = hPx;
 
-		var ctx = this.GuiCanvasFillTOC.getContext('2d');
+		var ctx = drawingCanvas.getContext('2d');
 
 		ctx.fillStyle = "#FFFFFF";
 		ctx.fillRect(0, 0, wPx, hPx);
@@ -5906,7 +5922,7 @@ function CDrawingDocument()
 		editor.isViewMode = _oldTurn;
 	};
 
-	this.GetTOC_Buttons = function(idDiv1, idDiv2)
+	this.GetTOC_Buttons = function(idDiv1, idDiv2, styleWidth)
 	{
 		var div1 = document.getElementById(idDiv1);
 		var div2 = document.getElementById(idDiv2);
@@ -5941,7 +5957,7 @@ function CDrawingDocument()
 		canvas1.scaleAttributeText = scaleAttributeText;
 		canvas2.scaleAttributeText = scaleAttributeText;
 
-		var pixW = 248;
+		var pixW = (undefined === styleWidth) ? 248 : styleWidth;
 		var pixW_natural = AscCommon.AscBrowser.convertToRetinaValue(pixW, true);
 		var pixH = 0;
 		var pixH_natural = 0;
@@ -6588,7 +6604,7 @@ function CDrawingDocument()
                     var correctNum = 1;
                     if (levelNum === level.Text[i].Value)
                         correctNum = counterCurrent;
-                    text += AscCommon.IntToNumberFormat(correctNum, level.Format, level.GetOLang());
+                    text += AscCommon.IntToNumberFormat(correctNum, level.Format, level.get_OLang());
                     break;
                 default:
                     break;
@@ -6709,7 +6725,7 @@ function CDrawingDocument()
                             text += curLvl.Text[j].Value;
                             break;
                         case Asc.c_oAscNumberingLvlTextType.Num:
-                            text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.GetOLang());
+                            text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.get_OLang());
                             break;
                         default:
                             break;
@@ -6941,7 +6957,7 @@ function CDrawingDocument()
                             text += curLvl.Text[j].Value;
                             break;
                         case Asc.c_oAscNumberingLvlTextType.Num:
-                            text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.GetOLang());
+                            text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.get_OLang());
                             break;
                         default:
                             break;
@@ -7186,7 +7202,7 @@ function CDrawingDocument()
 									text += curLvl.Text[j].Value;
 									break;
 								case Asc.c_oAscNumberingLvlTextType.Num:
-									text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.GetOLang());
+									text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.get_OLang());
 									break;
 								default:
 									break;
@@ -7216,7 +7232,7 @@ function CDrawingDocument()
 								text += curLvl.Text[j].Value;
 								break;
 							case Asc.c_oAscNumberingLvlTextType.Num:
-								text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.GetOLang());
+								text += AscCommon.IntToNumberFormat(1, curLvl.Format, curLvl.get_OLang());
 								break;
 							default:
 								break;
@@ -7355,7 +7371,7 @@ function CDrawingDocument()
 							var correctNum = 1;
 							if (levelNum === props[i].Text[k].Value)
 								correctNum = counterCurrent;
-							text += AscCommon.IntToNumberFormat(correctNum, props[i].Format, props[i].GetOLang());
+							text += AscCommon.IntToNumberFormat(correctNum, props[i].Format, props[i].get_OLang());
 							break;
 						default:
 							break;

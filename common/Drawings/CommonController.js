@@ -5432,6 +5432,15 @@ DrawingObjectsController.prototype =
         }
         else if(this.selectedObjects.length > 0)
         {
+            if(this.selectedObjects[0].animMotionTrack) 
+            {
+                var oTiming = this.drawingObjects.timing;
+                if(oTiming) 
+                {
+                    oTiming.removeSelectedEffects();
+                }
+                return;
+            }
             var aSO, oSp;
             var worksheet = this.drawingObjects.getWorksheet();
             var oWBView;
@@ -8075,7 +8084,9 @@ DrawingObjectsController.prototype =
                         anchor: drawing.getDrawingBaseType(),
                         protectionLockText: (bGroupSelection || !drawing.group) ? drawing.getProtectionLockText() : null,
                         protectionLocked: drawing.getProtectionLocked(),
-                        protectionPrint: drawing.getProtectionPrint()
+                        protectionPrint: drawing.getProtectionPrint(),
+                        x: drawing.x,
+                        y: drawing.y
                     };
                     if(!shape_props)
                         shape_props = new_shape_props;
@@ -8177,7 +8188,9 @@ DrawingObjectsController.prototype =
                         anchor: drawing.getDrawingBaseType(),
                         protectionLockText: (bGroupSelection || !drawing.group) ? drawing.getProtectionLockText() : null,
                         protectionLocked: drawing.getProtectionLocked(),
-                        protectionPrint: drawing.getProtectionPrint()
+                        protectionPrint: drawing.getProtectionPrint(),
+                        x: drawing.x,
+                        y: drawing.y
                     };
                     if(!shape_props)
                         shape_props = new_shape_props;
@@ -8341,7 +8354,9 @@ DrawingObjectsController.prototype =
                         anchor: drawing.getDrawingBaseType(),
                         protectionLockText: (bGroupSelection || !drawing.group) ? drawing.getProtectionLockText() : null,
                         protectionLocked: drawing.getProtectionLocked(),
-                        protectionPrint: drawing.getProtectionPrint()
+                        protectionPrint: drawing.getProtectionPrint(),
+                        x: drawing.x,
+                        y: drawing.y
                     };
                     if(!shape_props)
                         shape_props = new_shape_props;
@@ -8479,6 +8494,11 @@ DrawingObjectsController.prototype =
                         }
                         new_table_props.TableDescription = drawing.getDescription();
                         new_table_props.TableCaption = drawing.getTitle();
+                        new_table_props.FrameWidth = drawing.extX;
+                        new_table_props.FrameHeight = drawing.extY;
+                        new_table_props.FrameX = drawing.x;
+                        new_table_props.FrameY = drawing.y;
+                        new_table_props.FrameLockAspect = drawing.getNoChangeAspect();
                     }
                     else
                     {
@@ -11551,8 +11571,21 @@ function CalcLiterByLength(aAlphaBet, nLength)
         return numberingType;
     }
 
+    function fFillImageBullet(bullet, url) {
+        var buBlip = new AscFormat.CBuBlip();
+        var blip = CreateBlipFillUniFillFromUrl(url);
+        buBlip.setBlip(blip);
+        bullet.bulletType = new AscFormat.CBulletType();
+        bullet.bulletType.type = AscFormat.BULLET_TYPE_BULLET_BLIP;
+        bullet.bulletType.setBlip(buBlip);
+    }
+
 
     function fFillBullet(NumInfo, bullet) {
+        if (NumInfo.Blip) {
+            fFillImageBullet(bullet, NumInfo.Blip.url);
+            return;
+        }
         if(NumInfo.SubType < 0)
         {
             bullet.bulletType = new AscFormat.CBulletType();
@@ -11653,7 +11686,7 @@ function CalcLiterByLength(aAlphaBet, nLength)
         }
     }
     function fGetPresentationBulletByNumInfo(NumInfo){
-        if(!AscFormat.isRealNumber(NumInfo.Type) && !AscFormat.isRealNumber(NumInfo.SubType))
+        if(!AscFormat.isRealNumber(NumInfo.Type) && !AscFormat.isRealNumber(NumInfo.SubType) && !(NumInfo.Blip instanceof Asc.asc_CFillBlip))
         {
             return null;
         }
@@ -11996,6 +12029,7 @@ function CalcLiterByLength(aAlphaBet, nLength)
 	window['AscFormat'].fGetDefaultShapeExtents = fGetDefaultShapeExtents;
 	window['AscFormat'].HitToRect = HitToRect;
 	window['AscFormat'].drawingsUpdateForeignCursor = drawingsUpdateForeignCursor;
+	window['AscFormat'].fFillImageBullet = fFillImageBullet;
 
     window['AscCommon'] = window['AscCommon'] || {};
     window["AscCommon"].CDrawTask = CDrawTask;

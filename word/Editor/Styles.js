@@ -17144,8 +17144,8 @@ CParaPr.prototype.Get_PresentationBullet = function(theme, colorMap)
 			}
 			case AscFormat.BULLET_TYPE_BULLET_BLIP :
 			{
-				Bullet.m_nType = numbering_presentationnumfrmt_Char;
-				Bullet.m_sChar = "•";
+				Bullet.m_nType = numbering_presentationnumfrmt_Blip;
+				Bullet.m_sSrc = AscCommon.getFullImageSrc2(this.Bullet.getImageBulletURL());
 				break;
 			}
 		}
@@ -17640,8 +17640,13 @@ window["AscCommonWord"].border_Single = border_Single;
 window["AscCommonWord"].Default_Tab_Stop = Default_Tab_Stop;
 window["AscCommonWord"].highlight_None = highlight_None;
 window["AscCommonWord"].spacing_Auto = spacing_Auto;
-window["AscCommonWord"].wrap_NotBeside = wrap_NotBeside;
 window["AscCommonWord"].wrap_Around = wrap_Around;
+window["AscCommonWord"].wrap_Auto = wrap_Auto;
+window["AscCommonWord"].wrap_None = wrap_None;
+window["AscCommonWord"].wrap_NotBeside = wrap_NotBeside;
+window["AscCommonWord"].wrap_Through = wrap_Through;
+window["AscCommonWord"].wrap_Tight = wrap_Tight;
+
 
 // Создаем глобальные дефолтовые стили, чтобы быстро можно было отдать дефолтовые настройки
 var g_oDocumentDefaultTextPr = new CTextPr();

@@ -1001,7 +1001,17 @@
 		}
 		return stack.join("/");
 	}
-
+	function getSourceImageSize(src)
+	{
+		var oApi = (Asc.editor || editor);
+		if(oApi) {
+			var _img = oApi.ImageLoader.map_image_index[src];
+			if (_img && _img.Image) {
+				return {width: _img.Image.width, height: _img.Image.height};
+			}
+		}
+		return {width: 0, height: 0};
+	}
 	function getFullImageSrc2(src)
 	{
 		if (window["NATIVE_EDITOR_ENJINE"])
@@ -3697,7 +3707,7 @@
 
 			if (bNeedUpdate)
 			{
-				oLogicDocument.TrackRevisionsManager.Clear_VisibleChanges();
+				oLogicDocument.TrackRevisionsManager.ClearSelectedChanges();
 				oLogicDocument.Document_UpdateInterfaceState(false);
 			}
 		}
@@ -11109,6 +11119,7 @@
 			}
 		});
 	}
+
 	if (!Object.values) {
 		Object.values = function (obj) {
 			return Object.keys(obj).map(function (e) {
@@ -11291,6 +11302,9 @@
 			res[i - start] = i;
 		}
 		return res;
+	}
+	function isEqualSortedArrays(array1, array2) {
+		return array1.length === array2.length && array1.every(function(value, index) { return value === array2[index]});
 	}
 
 	var g_oBackoffDefaults = {
@@ -11822,6 +11836,8 @@
 	window["AscCommon"].backoffOnErrorImg = backoffOnErrorImg;
 	window["AscCommon"].isEmptyObject = isEmptyObject;
 
+	window["AscCommon"].getSourceImageSize = getSourceImageSize;
+
 	window["AscCommon"].CSignatureDrawer = window["AscCommon"]["CSignatureDrawer"] = CSignatureDrawer;
 	var prot = CSignatureDrawer.prototype;
 	prot["getImages"] 	= prot.getImages;
@@ -11839,6 +11855,7 @@
 	window["AscCommon"].valueToMmType = valueToMmType;
 	window["AscCommon"].arrayMove = arrayMove;
 	window["AscCommon"].getRangeArray = getRangeArray;
+	window["AscCommon"].isEqualSortedArrays = isEqualSortedArrays;
 
 	window["AscCommon"].CUnicodeStringEmulator = CUnicodeStringEmulator;
 

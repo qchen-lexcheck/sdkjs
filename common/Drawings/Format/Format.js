@@ -2931,6 +2931,69 @@ CBlipFill.prototype =
             _ret.rotWithShape = this.rotWithShape;
         }
         return _ret;
+    },
+
+    getBase64RasterImageId: function (bReduce)
+    {
+        var sRasterImageId = this.RasterImageId;
+        if(typeof sRasterImageId !== "string" || sRasterImageId.length === 0)
+        {
+            return null;
+        }
+        if(sRasterImageId.indexOf("data:") === 0 && sRasterImageId.index("base64") > 0)
+        {
+            return sRasterImageId;
+        }
+        var oApi = Asc.editor || editor;
+        var sDefaultResult = sRasterImageId;
+        if(!oApi)
+        {
+            return sDefaultResult;
+        }
+        var oImageLoader = oApi.ImageLoader;
+        if(!oImageLoader)
+        {
+            return sDefaultResult;
+        }
+        var oImage = oImageLoader.map_image_index[AscCommon.getFullImageSrc2(sRasterImageId)];
+        if(!oImage || !oImage.Image || oImage.Status !== AscFonts.ImageLoadStatus.Complete)
+        {
+            return sDefaultResult;
+        }
+        var sResult = sDefaultResult;
+        if(!window["NATIVE_EDITOR_ENJINE"])
+        {
+            var oCanvas = document.createElement("canvas");
+            var nW = Math.max(oImage.Image.width, 1);
+            var nH = Math.max(oImage.Image.height, 1);
+            if(bReduce)
+            {
+                var nMaxSize = 640;
+                var dWK = nW/nMaxSize;
+                var dHK = nH/nMaxSize;
+                var dK = Math.max(dWK, dHK);
+                if(dK > 1)
+                {
+                    nW = ((nW / dK) + 0.5 >> 0);
+                    nH = ((nH / dK) + 0.5 >> 0);
+                }
+            }
+            oCanvas.width = nW;
+            oCanvas.height = nH;
+            var oCtx = oCanvas.getContext("2d");
+            oCtx.drawImage(oImage.Image, 0, 0, oCanvas.width, oCanvas.height);
+            try
+            {
+                sResult = oCanvas.toDataURL("image/png");
+            }
+            catch (err)
+            {
+                sResult = sDefaultResult;
+            }
+            return sResult;
+        }
+
+        return sRasterImageId;
     }
 };
 
@@ -5401,6 +5464,10 @@ function FormatRGBAColor()
     {
         return this.IsIdentical(unfill);
     };
+    CUniFill.prototype.isEqual = function(unfill)
+    {
+        return this.IsIdentical(unfill);
+    };
     CUniFill.prototype.compare = function(unifill)
     {
         if(unifill == null)
@@ -5430,6 +5497,78 @@ function FormatRGBAColor()
     };
     CUniFill.prototype.isVisible = function() {
         return this.fill && this.fill.type !== window['Asc'].c_oAscFill.FILL_TYPE_NOFILL;
+    };
+
+
+    function CBuBlip() {
+        this.blip = null;
+    }
+
+    CBuBlip.prototype.setBlip = function (oPr) {
+        this.blip = oPr;
+    };
+
+    CBuBlip.prototype.fillObject = function (oCopy, oIdMap) {
+        if (this.blip) {
+            oCopy.setBlip(this.blip.createDuplicate(oIdMap));
+        }
+    };
+    
+    CBuBlip.prototype.createDuplicate = function () {
+        var oCopy = new CBuBlip();
+        this.fillObject(oCopy, {});
+        return oCopy;
+    };
+
+    CBuBlip.prototype.getChildren = function () {
+        return [this.blip];
+    };
+
+    CBuBlip.prototype.isEqual = function (oBlip) {
+        return this.blip.isEqual(oBlip.blip);
+    };
+
+    CBuBlip.prototype.toPPTY = function (pWriter) {
+        var _src = this.blip.fill.RasterImageId;
+        var imageLocal = AscCommon.g_oDocumentUrls.getImageLocal(_src);
+        if(imageLocal)
+            _src = imageLocal;
+
+        pWriter.image_map[_src] = true;
+
+        _src = pWriter.prepareRasterImageIdForWrite(_src);
+        pWriter.WriteBlip(this.blip.fill, _src);
+    };
+
+    CBuBlip.prototype.fromPPTY = function (pReader, oParagraph, oBullet) {
+        this.setBlip(new AscFormat.CUniFill());
+        this.blip.setFill(new AscFormat.CBlipFill());
+        pReader.ReadBlip(this.blip, undefined, undefined, undefined, oParagraph, oBullet);
+    };
+
+    CBuBlip.prototype.Read_FromBinary = function (r) {
+        if (r.GetBool()) {
+            this.blip = new CUniFill();
+            this.blip.Read_FromBinary(r);
+        }
+    };
+
+    CBuBlip.prototype.Write_ToBinary = function (w) {
+        w.WriteBool(isRealObject(this.blip));
+        if (isRealObject(this.blip)) {
+            this.blip.Write_ToBinary(w);
+        }
+    };
+
+    CBuBlip.prototype.compare = function (compareObj) {
+        var ret = null;
+        if (compareObj instanceof CBuBlip) {
+            ret = new CBuBlip();
+            if (this.blip) {
+                ret.setBlip(this.blip.compare(compareObj.blip));
+            }
+        }
+        return ret;
     };
 
 function CompareUniFill(unifill_1, unifill_2)
@@ -5663,6 +5802,22 @@ function CompareShapeProperties(shapeProp1, shapeProp2)
     {
         _result_shape_prop.w = null;
     }
+    if(shapeProp1.x === shapeProp2.x)
+    {
+        _result_shape_prop.x = shapeProp1.x;
+    }
+    else
+    {
+        _result_shape_prop.x = null;
+    }
+    if(shapeProp1.y === shapeProp2.y)
+    {
+        _result_shape_prop.y = shapeProp1.y;
+    }
+    else
+    {
+        _result_shape_prop.y = null;
+    }
     if(shapeProp1.rot === shapeProp2.rot)
     {
         _result_shape_prop.rot = shapeProp1.rot;
@@ -5820,9 +5975,11 @@ function CompareShapeProperties(shapeProp1, shapeProp2)
     {
         _result_shape_prop.shadow = null;
     }
+
     _result_shape_prop.protectionLockText = CompareProtectionFlags(shapeProp1.protectionLockText, shapeProp2.protectionLockText);
     _result_shape_prop.protectionLocked = CompareProtectionFlags(shapeProp1.protectionLocked, shapeProp2.protectionLocked);
     _result_shape_prop.protectionPrint = CompareProtectionFlags(shapeProp1.protectionPrint, shapeProp2.protectionPrint);
+
     return _result_shape_prop;
 }
 
@@ -10832,7 +10989,9 @@ function CompareBullets(bullet1, bullet2)
             }
             case AscFormat.BULLET_TYPE_BULLET_BLIP:
             {
-                ret.bulletType.type = AscFormat.BULLET_TYPE_BULLET_CHAR; //TODO: в меню отдаем, что символьный.
+                ret.bulletType.type = AscFormat.BULLET_TYPE_BULLET_BLIP;
+                var compareBlip = bullet1.bulletType.Blip && bullet1.bulletType.Blip.compare(bullet2.bulletType.Blip);
+                ret.bulletType.Blip = compareBlip;
                 break;
             }
             case AscFormat.BULLET_TYPE_BULLET_AUTONUM:
@@ -11131,8 +11290,135 @@ function CompareBullets(bullet1, bullet2)
         }
         return true;
     };
+    CBullet.prototype.fillBulletImage = function (url) {
+        if (!this.bulletType) {
+            this.bulletType = new CBulletType();
+        }
+        if (!this.bulletType.Blip) {
+            this.bulletType.Blip = new AscFormat.CBuBlip();
+        }
+        this.bulletType.Type = AscFormat.BULLET_TYPE_BULLET_BLIP;
+        this.bulletType.Blip.setBlip(AscFormat.CreateBlipFillUniFillFromUrl(url));
+
+    }
+    CBullet.prototype.getImageBulletURL = function () {
+        return (this.bulletType
+          && this.bulletType.Blip
+          && this.bulletType.Blip.blip
+          && this.bulletType.Blip.blip.fill
+          && this.bulletType.Blip.blip.fill.RasterImageId);
+    }
+
+    CBullet.prototype.drawSquareImage = function () {
+        var url = this.getImageBulletURL();
+        if(!url || !editor){
+            return;
+        }
+        var oDiv = document.getElementById(this.DivId);
+        if(!oDiv){
+            return;
+        }
+        var aChildren = oDiv.children;
+        var oCanvas = null;
+        for(var i = 0; i < aChildren.length; ++i){
+            if(aChildren[i].nodeName && aChildren[i].nodeName.toUpperCase() === 'CANVAS'){
+                oCanvas = aChildren[i];
+                break;
+            }
+        }
+        var nWidth = oDiv.clientWidth;
+        var nHeight = oDiv.clientHeight;
+        if (nWidth !== nHeight) {
+            return;
+        }
+        if(null === oCanvas){
+            oCanvas = document.createElement('canvas');
+            oCanvas.width = parseInt(nWidth);
+            oCanvas.height = parseInt(nHeight);
+            oDiv.appendChild(oCanvas);
+        }
+        var oContext = oCanvas.getContext('2d');
+        oContext.clearRect(0, 0, oCanvas.width, oCanvas.height);
+        var _img = this.Api.ImageLoader.map_image_index[AscCommon.getFullImageSrc2(url)];
+        if (_img != undefined && _img.Image != null && _img.Status != AscFonts.ImageLoadStatus.Loading)
+        {
+            var indent = nWidth * 0.125;
+            var _x = indent;
+            var _y = indent;
+            var _w = nWidth - indent;
+            var _h = nHeight - indent;
+            oContext.drawImage(_img.Image, _x, _y, _w, _h);
+        }
+    }
     //interface methods
     var prot = CBullet.prototype;
+    prot.put_ImageUrl = function (sUrl, token) {
+        var _this = this;
+        var Api = editor;
+        if(!Api)
+        {
+            return;
+        }
+        AscCommon.sendImgUrls(Api, [sUrl], function(data) {
+            if (data && data[0] && data[0].url !== "error")
+            {
+                var url = AscCommon.g_oDocumentUrls.imagePath2Local(data[0].path);
+                Api.ImageLoader.LoadImagesWithCallback([AscCommon.getFullImageSrc2(url)], function(){
+                    _this.fillBulletImage(url);
+                    //_this.drawSquareImage();
+                    _this.Api.sendEvent("asc_onBulletImageLoaded");
+                });
+            }
+        }, false, false, token);
+    }
+    prot["put_ImageUrl"] = prot["asc_putImageUrl"] = CBullet.prototype.put_ImageUrl;
+    prot.showFileDialog = function () {
+        if(!editor){
+            return;
+        }
+        var t = editor;
+        var _this = this;
+        AscCommon.ShowImageFileDialog(t.documentId, t.documentUserId, t.CoAuthoringApi.get_jwt(), function(error, files)
+          {
+              if (Asc.c_oAscError.ID.No !== error)
+              {
+                  t.sendEvent("asc_onError", error, Asc.c_oAscError.Level.NoCritical);
+              }
+              else
+              {
+                  t.sync_StartAction(Asc.c_oAscAsyncActionType.BlockInteraction, Asc.c_oAscAsyncAction.UploadImage);
+                  AscCommon.UploadImageFiles(files, t.documentId, t.documentUserId, t.CoAuthoringApi.get_jwt(), function(error, urls)
+                  {
+                      if (Asc.c_oAscError.ID.No !== error)
+                      {
+                          t.sendEvent("asc_onError", error, Asc.c_oAscError.Level.NoCritical);
+                          t.sync_EndAction(Asc.c_oAscAsyncActionType.BlockInteraction, Asc.c_oAscAsyncAction.UploadImage);
+                      }
+                      else
+                      {
+                          t.ImageLoader.LoadImagesWithCallback(urls, function(){
+                              if(urls.length > 0)
+                              {
+                                  _this.fillBulletImage(urls[0]);
+                                  //_this.drawSquareImage();
+                                  t.sendEvent("asc_onBulletImageLoaded");
+                              }
+                              t.sync_EndAction(Asc.c_oAscAsyncActionType.BlockInteraction, Asc.c_oAscAsyncAction.UploadImage);
+                          });
+                      }
+                  });
+              }
+          },
+          function(error)
+          {
+              if (Asc.c_oAscError.ID.No !== error)
+              {
+                  t.sendEvent("asc_onError", error, Asc.c_oAscError.Level.NoCritical);
+              }
+              t.sync_StartAction(Asc.c_oAscAsyncActionType.BlockInteraction, Asc.c_oAscAsyncAction.UploadImage);
+          });
+    }
+    prot["showFileDialog"] = prot["asc_showFileDialog"] = CBullet.prototype.showFileDialog;
     prot.asc_getSize = function () {
         var nRet = 100;
         if(this.bulletSize) {
@@ -11502,6 +11788,7 @@ function CBulletType()
     this.type = null;//BULLET_TYPE_BULLET_NONE;
     this.Char = null;
     this.AutoNumType = null;
+    this.Blip = null;
     this.startAt = null;
 }
 
@@ -11521,7 +11808,8 @@ CBulletType.prototype =
         return this.type === oBulletType.type
             && this.Char === oBulletType.Char
             && this.AutoNumType === oBulletType.AutoNumType
-            && this.startAt === oBulletType.startAt;
+            && this.startAt === oBulletType.startAt
+            && ((this.Blip && this.Blip.isEqual(oBulletType.Blip)) || this.Blip === oBulletType.Blip);
     },
 
     merge: function(oBulletType)
@@ -11536,6 +11824,9 @@ CBulletType.prototype =
             this.Char = oBulletType.Char;
             this.AutoNumType = oBulletType.AutoNumType;
             this.startAt = oBulletType.startAt;
+            if (oBulletType.Blip) {
+                this.Blip = oBulletType.Blip.createDuplicate();
+            }
         }
         else
         {
@@ -11548,6 +11839,12 @@ CBulletType.prototype =
                     {
                         this.Char = oBulletType.Char;
                     }
+                }
+            }
+            if(this.type === AscFormat.BULLET_TYPE_BULLET_BLIP)
+            {
+                if (this.Blip instanceof AscFormat.CBuBlip && this.Blip !== oBulletType.Blip) {
+                    this.Blip = oBulletType.Blip.createDuplicate();
                 }
             }
             if(this.type === AscFormat.BULLET_TYPE_BULLET_AUTONUM)
@@ -11572,7 +11869,14 @@ CBulletType.prototype =
         d.Char = this.Char;
         d.AutoNumType = this.AutoNumType;
         d.startAt = this.startAt;
+        if (this.Blip) {
+            d.Blip = this.Blip.createDuplicate();
+        }
         return d;
+    },
+
+    setBlip: function (oPr) {
+        this.Blip = oPr;
     },
 
     Write_ToBinary: function(w)
@@ -11600,6 +11904,10 @@ CBulletType.prototype =
         {
             w.WriteLong(this.startAt);
         }
+        w.WriteBool(isRealObject(this.Blip));
+        if (isRealObject(this.Blip)) {
+            this.Blip.Write_ToBinary(w);
+        }
     },
 
     Read_FromBinary: function(r)
@@ -11623,6 +11931,20 @@ CBulletType.prototype =
         if(r.GetBool())
         {
             (this.startAt) = r.GetLong();
+        }
+        if (r.GetBool()) {
+            this.Blip = new CBuBlip();
+            this.Blip.Read_FromBinary(r);
+
+            var oUnifill = this.Blip.blip;
+            var sRasterImageId = oUnifill && oUnifill.fill && oUnifill.fill.RasterImageId;
+            if(typeof AscCommon.CollaborativeEditing !== "undefined")
+            {
+                if(typeof sRasterImageId === "string" && sRasterImageId.length > 0)
+                {
+                    AscCommon.CollaborativeEditing.Add_NewImage(sRasterImageId);
+                }
+            }
         }
     }
 };
@@ -12596,6 +12918,12 @@ function CreateAscShapePropFromProp(shapeProp)
     {
         obj.signatureId = shapeProp.signatureId;
     }
+
+    if(shapeProp.signatureId)
+    {
+        obj.signatureId = shapeProp.signatureId;
+    }
+    obj.Position = new Asc.CPosition({X: shapeProp.x, Y: shapeProp.y});
     return obj;
 }
 
@@ -13565,6 +13893,7 @@ function CorrectUniColor(asc_color, unicolor, flag)
     window['AscFormat'].CHyperlink = CHyperlink;
     window['AscFormat'].CTextParagraphPr = CTextParagraphPr;
     window['AscFormat'].CompareBullets = CompareBullets;
+    window['AscFormat'].CBuBlip = CBuBlip;
     window['AscFormat'].CBullet = CBullet;
     window['AscFormat'].CBulletColor = CBulletColor;
     window['AscFormat'].CBulletSize = CBulletSize;
@@ -13767,6 +14096,7 @@ function CorrectUniColor(asc_color, unicolor, flag)
         window['AscFormat'].InitClass = InitClass;
         window['AscFormat'].CBaseObject           = CBaseObject;
         window['AscFormat'].CBaseFormatObject = CBaseFormatObject;
+        window['AscFormat'].checkRasterImageId = checkRasterImageId;
 
     window['AscFormat'].DEFAULT_COLOR_MAP = GenerateDefaultColorMap();
 })(window);
