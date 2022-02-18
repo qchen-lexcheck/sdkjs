@@ -6123,6 +6123,7 @@ drawBarChart.prototype = {
 
 		var drawVerges = function (i, j, paths, onlyLessNull, k, isNotPen, isNotBrush) {
 			var brush = null, pen = null, options;
+			var shapeType = null !== t.chart.series[i].shape ? t.chart.series[i].shape : t.chart.shape;
 			options = t._getOptionsForDrawing(i, j, onlyLessNull);
 			if (paths !== null && options !== null) {
 				if (!isNotPen) {
@@ -6131,8 +6132,7 @@ drawBarChart.prototype = {
 				if (!isNotBrush) {
 					brush = options.brush;
 				}
-
-				t._drawBar3D(paths, pen, brush, k, options.val);
+				t._drawBar3D(paths, pen, brush, k, options.val, shapeType);
 			}
 		};
 
@@ -6184,7 +6184,7 @@ drawBarChart.prototype = {
 		return {pen: pen, brush: brush, val: pt.val}
 	},
 
-	_drawBar3D: function (path, pen, brush, k, val) {
+	_drawBar3D: function (path, pen, brush, k, val, shapeType) {
 		//затемнение боковых сторон
 		//в excel всегда темные боковые стороны, лицевая и задняя стороны светлые
 		//TODO пересмотреть получения pen
@@ -6244,8 +6244,112 @@ drawBarChart.prototype = {
 
 			this.cChartDrawer.drawPath(path, pen, duplicateBrush);
 		} else {
+			if (shapeType === AscFormat.BAR_SHAPE_CYLINDER || shapeType === AscFormat.BAR_SHAPE_CONE || shapeType === AscFormat.BAR_SHAPE_CONETOMAX) {
+				if (k === 5 || k === 0) {
+					brush = this._getCylinderBrush(brush);
+				}
+			}
 			this.cChartDrawer.drawPath(path, pen, brush);
 		}
+	},
+
+	_getCylinderBrush: function (brush) {
+
+		if (brush.fill && AscDFH.historyitem_type_SolidFill !== brush.fill.getObjectType()) {
+			return brush;
+		}
+		//var props = this.cChartSpace.getParentObjects();
+		var gradientBrush = brush.createDuplicate();
+
+		gradientBrush.setFill(new AscFormat.CGradFill());
+
+		// для визуализации света используем заливку в 4 цвета - 2 светлых, 2 темных
+		var lightTempColor = new AscFormat.CGs();
+		var colr = new AscFormat.CUniColor();
+
+		var lightTempColor2 = new AscFormat.CGs();
+		var colr2 = new AscFormat.CUniColor();
+
+		if (brush.fill && AscDFH.historyitem_type_GradFill === brush.fill.getObjectType()) {
+			colr.RGBA = brush.fill.colors[0].color.RGBA;
+			colr2.RGBA = brush.fill.colors[0].color.RGBA;
+			lightTempColor.setColor(colr);
+			lightTempColor2.setColor(colr);
+		} else {
+			colr.RGBA = brush.fill.color ? brush.fill.color.RGBA : new AscFormat.CUniColor().RGBA;
+			colr2.RGBA = brush.fill.color ? brush.fill.color.RGBA : new AscFormat.CUniColor().RGBA;
+			lightTempColor.setColor(colr);
+			lightTempColor2.setColor(colr);
+		}
+
+		// меняем стартовую позицию цвета в зависимости от угла
+		var startPosLight = this._getGradientPosByAngle();
+
+		// позиция принимает значения от 0 до 100000
+		// 20000 значение диапозона света
+		lightTempColor.pos = startPosLight;
+		lightTempColor2.pos = lightTempColor.pos + 20000;
+
+
+
+		var shadeTempColor = new AscFormat.CGs();
+		var colrShade = new AscFormat.CUniColor();
+		colrShade.RGBA = //brush.fill.color ? brush.fill.color.RGBA : new AscFormat.CUniColor().RGBA;
+		{
+			R: 70,
+			G: 70,
+			B: 70,
+			A: 255
+		};
+		shadeTempColor.setColor(colrShade);
+		shadeTempColor.pos = 0;
+
+		var shadeTempColor2 = new AscFormat.CGs();
+		var colrShade2 = new AscFormat.CUniColor();
+		colrShade2.RGBA = //brush.fill.color ? brush.fill.color.RGBA : new AscFormat.CUniColor().RGBA;
+		{
+			R: 70,
+			G: 70,
+			B: 70,
+			A: 255
+		};
+		shadeTempColor2.setColor(colrShade2);
+		shadeTempColor2.pos = 100000;
+
+
+		gradientBrush.fill.colors = [shadeTempColor, lightTempColor, lightTempColor2, shadeTempColor2];
+
+		return gradientBrush;
+	},
+
+	_getGradientPosByAngle: function () {
+		var angle = Math.abs(this.cChartDrawer.processor3D.angleOy);
+
+		var tempAngle;
+		var pos = 80000;
+		// угловой kef позиции крайняя правая позиция 80000 делится на угловой сектор в 90 градусов
+		var posKef = pos / 90;
+
+		if (angle >= 0 && angle <= Math.PI / 2) {
+			tempAngle = (angle * 180 / Math.PI);
+
+		} else if (angle > Math.PI / 2 && angle < Math.PI) {
+			tempAngle = (angle * 180 / Math.PI) - 90;
+
+		} else if (angle > Math.PI && angle < Math.PI * 1.5) {
+			tempAngle = (angle * 180 / Math.PI) - 180;
+
+		} else if (angle >= Math.PI * 1.5) {
+			tempAngle = (angle * 180 / Math.PI) - 270;
+
+		}
+		if ((pos - (posKef * tempAngle)) > posKef) {
+			pos -= posKef * tempAngle;
+		} else {
+			pos = 0;
+		}
+
+		return pos;
 	},
 
 	_calculateRect3D: function (startX, startY, individualBarWidth, height, val, serNum, type, maxH, minH, arr, cubeCount, idx, testHeight) {
